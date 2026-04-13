@@ -40,6 +40,7 @@ the current commit with an Assisted-By trailer.`,
 		newAmendCmd(p, gitClient, repoErr),
 		newPoolCmd(p, poolPath),
 		newClearCmd(p, poolPath),
+		newSetupCmd(),
 	)
 
 	return root.Execute()
