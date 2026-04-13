@@ -1,8 +1,8 @@
 # scribe
 
-> AI attribution tracking for your git commits.
+> LLM attribution tracking for your git commits.
 
-`scribe` maintains a **per-repo pool** of AI tool usage events. Every time an AI tool invokes the LLM, a hook adds an entry to the pool. When you're ready to commit or after committing, run `scribe amend` to drain the pool and annotate the commit with:
+`scribe` maintains a **per-repo pool** of LLM tool usage events. Every time an LLM tool invokes the LLM, a hook adds an entry to the pool. When you're ready to commit or after committing, run `scribe amend` to drain the pool and annotate the commit with:
 
 ```
 Assisted-By: anthropic:claude-sonnet-4-6, github:gpt-4o
@@ -30,6 +30,9 @@ export PATH="$HOME/go/bin:$PATH"
 # See what's in the pool right now
 scribe pool
 
+# Show full hook payload details for debugging
+scribe pool --debug
+
 # Preview the Assisted-By trailer without modifying anything
 scribe amend --dry-run
 
@@ -44,7 +47,7 @@ scribe clear
 
 ## Tool Configuration
 
-### Claude Code CLI (recommended — automatic)
+### Claude Code CLI
 
 Claude Code fires `PostToolUse` hooks after every file write. Add the following to `~/.claude/settings.json`:
 
@@ -70,7 +73,7 @@ Claude Code fires `PostToolUse` hooks after every file write. Add the following 
 
 ---
 
-### GitHub Copilot Chat — VS Code Agent Hooks (automatic)
+### GitHub Copilot Chat
 
 VS Code Copilot Chat supports **Agent Hooks** (preview) that fire when the agent uses tools.
 
@@ -87,6 +90,8 @@ Add to your user or workspace `settings.json`:
 ```
 
 **No `--model` flag needed.** `scribe` reads the model from the hook payload. Falls back to the `COPILOT_MODEL` or `GITHUB_COPILOT_MODEL` environment variable if the payload doesn't include it.
+
+> **Warning:** If you're using the Copilot Chat in VS Code right now the hook call doesn't include the model in the payload, neither `COPILOT_MODEL` nor `GITHUB_COPILOT_MODEL` are set, the pool entry will have an empty model. If you really want to track the exact model, you can set `COPILOT_MODEL` manually for now. The hooks API is in preview and expected to improve.
 
 > **Note:** The VS Code Agent Hooks API is in preview. See the [VS Code Copilot hooks documentation](https://code.visualstudio.com/docs/copilot/customization/hooks) for the latest config format and payload schema.
 

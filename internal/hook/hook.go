@@ -8,10 +8,10 @@ import (
 	"github.com/jordi-jordi/scribe/internal/pool"
 )
 
-// Parser parses a hook payload from a specific AI tool and returns pool
+// Parser parses a hook payload from a specific LLM tool and returns pool
 // entries to record. Implementations self-register via init().
 type Parser interface {
-	// Name returns the unique format identifier (e.g. "claude-code", "copilot").
+	// Name returns the unique format identifier (e.g. "claude", "copilot").
 	Name() string
 
 	// Parse reads the hook payload from r and returns entries to add to the

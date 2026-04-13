@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jordi-jordi/scribe/internal/pool"
 
 	// Ensure parsers are registered (same as root.go does in production).
 	_ "github.com/jordi-jordi/scribe/internal/hook/claudecode"
@@ -17,7 +21,7 @@ func TestHook_AddsToPool_ClaudeCode(t *testing.T) {
 	cmd.SetIn(stdin)
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
-	cmd.SetArgs([]string{"--vendor", "anthropic", "--format", "claude-code"})
+	cmd.SetArgs([]string{"--vendor", "anthropic", "--format", "claude"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -126,5 +130,170 @@ func TestHook_FallbackModelFromFlag(t *testing.T) {
 	}
 	if p.entries[0].Model != "claude-opus-4-6" {
 		t.Errorf("expected model from --model flag, got %q", p.entries[0].Model)
+	}
+}
+
+func TestHook_SessionStartStoresSessionAndModel(t *testing.T) {
+	p := &mockPool{}
+	stdin := strings.NewReader(`{"hook_event_name":"SessionStart","session_id":"abc-123","model":"claude-sonnet-4-6"}`)
+
+	cmd := newHookCmd(p, "/fake/pool/path")
+	cmd.SetIn(stdin)
+	cmd.SetOut(&strings.Builder{})
+	cmd.SetErr(&strings.Builder{})
+	cmd.SetArgs([]string{"--vendor", "anthropic", "--format", "claude"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(p.entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(p.entries))
+	}
+	if p.entries[0].SessionID != "abc-123" {
+		t.Fatalf("expected session id to be stored, got %q", p.entries[0].SessionID)
+	}
+	if p.entries[0].Model != "claude-sonnet-4-6" {
+		t.Fatalf("expected model from SessionStart payload, got %q", p.entries[0].Model)
+	}
+}
+
+func TestHook_UsesSessionModelWhenPostToolUseHasNoModel(t *testing.T) {
+	p := &mockPool{entries: []pool.Entry{{
+		Vendor:    "anthropic",
+		Model:     "claude-sonnet-4-6",
+		SessionID: "sess-42",
+	}}}
+
+	stdin := strings.NewReader(`{"hook_event_name":"PostToolUse","session_id":"sess-42","tool_name":"Read","tool_input":{}}`)
+	cmd := newHookCmd(p, "/fake/pool/path")
+	cmd.SetIn(stdin)
+	cmd.SetOut(&strings.Builder{})
+	cmd.SetErr(&strings.Builder{})
+	cmd.SetArgs([]string{"--vendor", "anthropic", "--format", "claude"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(p.entries) != 2 {
+		t.Fatalf("expected 2 entries (existing + new), got %d", len(p.entries))
+	}
+	last := p.entries[len(p.entries)-1]
+	if last.Model != "claude-sonnet-4-6" {
+		t.Fatalf("expected model to be matched from session, got %q", last.Model)
+	}
+}
+
+func TestHook_TracksModelChangesWithinSameSession(t *testing.T) {
+	p := &mockPool{entries: []pool.Entry{{
+		Vendor:    "anthropic",
+		Model:     "claude-sonnet-4-6",
+		SessionID: "sess-77",
+	}}}
+
+	// First payload carries a newer model for the same session.
+	cmd := newHookCmd(p, "/fake/pool/path")
+	cmd.SetIn(strings.NewReader(`{"hook_event_name":"PostToolUse","session_id":"sess-77","model":"claude-opus-4-6","tool_name":"Read"}`))
+	cmd.SetOut(&strings.Builder{})
+	cmd.SetErr(&strings.Builder{})
+	cmd.SetArgs([]string{"--vendor", "anthropic", "--format", "claude"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error on known-model event: %v", err)
+	}
+
+	// Second payload has no model, should resolve to the latest one from same session.
+	cmd = newHookCmd(p, "/fake/pool/path")
+	cmd.SetIn(strings.NewReader(`{"hook_event_name":"PostToolUse","session_id":"sess-77","tool_name":"Edit"}`))
+	cmd.SetOut(&strings.Builder{})
+	cmd.SetErr(&strings.Builder{})
+	cmd.SetArgs([]string{"--vendor", "anthropic", "--format", "claude"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error on unknown-model event: %v", err)
+	}
+
+	last := p.entries[len(p.entries)-1]
+	if last.Model != "claude-opus-4-6" {
+		t.Fatalf("expected latest session model to be used, got %q", last.Model)
+	}
+}
+
+func TestHook_DoesNotMixSessionModelAcrossVendors(t *testing.T) {
+	p := &mockPool{entries: []pool.Entry{{
+		Vendor:    "github",
+		Model:     "gpt-4.1",
+		SessionID: "shared-session",
+	}}}
+
+	cmd := newHookCmd(p, "/fake/pool/path")
+	cmd.SetIn(strings.NewReader(`{"hook_event_name":"PostToolUse","session_id":"shared-session","tool_name":"Read"}`))
+	cmd.SetOut(&strings.Builder{})
+	cmd.SetErr(&strings.Builder{})
+	cmd.SetArgs([]string{"--vendor", "anthropic", "--format", "claude"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	last := p.entries[len(p.entries)-1]
+	if last.Model == "gpt-4.1" {
+		t.Fatalf("model leaked across vendors; got %q", last.Model)
+	}
+}
+
+func TestResolveModelFromTranscript(t *testing.T) {
+	dir := t.TempDir()
+	transcriptPath := filepath.Join(dir, "session.jsonl")
+	content := strings.Join([]string{
+		`{"type":"user","message":{"role":"user","content":"/model"}}`,
+		`{"type":"assistant","message":{"model":"claude-haiku-4-5-20251001"}}`,
+		`{"type":"assistant","message":{"model":"claude-sonnet-4-6"}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(transcriptPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write transcript: %v", err)
+	}
+
+	payload := `{"transcript_path":"` + transcriptPath + `"}`
+	got, ok := resolveModelFromTranscript(payload)
+	if !ok {
+		t.Fatal("expected transcript model resolution to succeed")
+	}
+	if got != "claude-sonnet-4-6" {
+		t.Fatalf("expected latest assistant model, got %q", got)
+	}
+}
+
+func TestResolveModelFromTranscript_NoPath(t *testing.T) {
+	if _, ok := resolveModelFromTranscript(`{"hook_event_name":"PostToolUse"}`); ok {
+		t.Fatal("expected no model without transcript_path")
+	}
+}
+
+func TestHook_TranscriptModelOverridesStaleSessionCache(t *testing.T) {
+	dir := t.TempDir()
+	transcriptPath := filepath.Join(dir, "session.jsonl")
+	content := strings.Join([]string{
+		`{"type":"assistant","message":{"model":"claude-opus-4-6"}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(transcriptPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write transcript: %v", err)
+	}
+
+	p := &mockPool{entries: []pool.Entry{{
+		Vendor:    "anthropic",
+		Model:     "claude-sonnet-4-6",
+		SessionID: "sess-99",
+	}}}
+
+	payload := `{"hook_event_name":"PostToolUse","session_id":"sess-99","transcript_path":"` + transcriptPath + `","tool_name":"Edit"}`
+	cmd := newHookCmd(p, "/fake/pool/path")
+	cmd.SetIn(strings.NewReader(payload))
+	cmd.SetOut(&strings.Builder{})
+	cmd.SetErr(&strings.Builder{})
+	cmd.SetArgs([]string{"--vendor", "anthropic", "--format", "claude"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	last := p.entries[len(p.entries)-1]
+	if last.Model != "claude-opus-4-6" {
+		t.Fatalf("expected transcript model to override stale cache, got %q", last.Model)
 	}
 }

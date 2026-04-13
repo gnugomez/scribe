@@ -17,9 +17,9 @@ import (
 func Execute() error {
 	root := &cobra.Command{
 		Use:   "scribe",
-		Short: "Track AI tool usage and annotate git commits with Assisted-By trailers",
-		Long: `scribe maintains a per-repo pool of AI tool usage events.
-Each time an AI tool (Claude Code, Copilot Chat, ...) invokes the LLM, a hook
+		Short: "Track Agent tool usage and annotate git commits with Assisted-By trailers",
+		Long: `scribe maintains a per-repo pool of Agent tool usage events.
+Each time an Agent tool invokes the LLM, a hook
 adds an entry to the pool. Run 'scribe amend' to drain the pool and annotate
 the current commit with an Assisted-By trailer.`,
 	}

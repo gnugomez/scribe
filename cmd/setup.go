@@ -436,23 +436,41 @@ func applyVSCodeHook(path string, settings map[string]interface{}) tea.Cmd {
 // ── pure helpers (shared with tests) ─────────────────────────────────────────
 
 const (
-	claudeHookCommand  = "scribe hook --vendor anthropic"
+	claudeHookCommand  = "scribe hook --vendor anthropic --format claude"
 	copilotHookCommand = "scribe hook --vendor github --format copilot"
 )
 
 func claudeHookPresent(settings map[string]interface{}) bool {
 	hooks, _ := settings["hooks"].(map[string]interface{})
+	if hooks == nil {
+		return false
+	}
+
+	postToolUseHasScribe := false
 	postToolUse, _ := hooks["PostToolUse"].([]interface{})
 	for _, item := range postToolUse {
 		group, _ := item.(map[string]interface{})
 		for _, h := range asSlice(group["hooks"]) {
 			hmap, _ := h.(map[string]interface{})
 			if cmd, _ := hmap["command"].(string); strings.Contains(cmd, "scribe hook") {
-				return true
+				postToolUseHasScribe = true
 			}
 		}
 	}
-	return false
+
+	sessionStartHasScribe := false
+	sessionStart, _ := hooks["SessionStart"].([]interface{})
+	for _, item := range sessionStart {
+		group, _ := item.(map[string]interface{})
+		for _, h := range asSlice(group["hooks"]) {
+			hmap, _ := h.(map[string]interface{})
+			if cmd, _ := hmap["command"].(string); strings.Contains(cmd, "scribe hook") {
+				sessionStartHasScribe = true
+			}
+		}
+	}
+
+	return postToolUseHasScribe && sessionStartHasScribe
 }
 
 func injectClaudeHook(settings map[string]interface{}) {
@@ -460,14 +478,48 @@ func injectClaudeHook(settings map[string]interface{}) {
 	if hooks == nil {
 		hooks = map[string]interface{}{}
 	}
+
+	postToolUseHasScribe := false
 	postToolUse, _ := hooks["PostToolUse"].([]interface{})
-	postToolUse = append(postToolUse, map[string]interface{}{
-		"matcher": "Write|Edit|MultiEdit",
-		"hooks": []interface{}{
-			map[string]interface{}{"type": "command", "command": claudeHookCommand},
-		},
-	})
-	hooks["PostToolUse"] = postToolUse
+	for _, item := range postToolUse {
+		group, _ := item.(map[string]interface{})
+		for _, h := range asSlice(group["hooks"]) {
+			hmap, _ := h.(map[string]interface{})
+			if cmd, _ := hmap["command"].(string); strings.Contains(cmd, "scribe hook") {
+				postToolUseHasScribe = true
+			}
+		}
+	}
+	if !postToolUseHasScribe {
+		postToolUse = append(postToolUse, map[string]interface{}{
+			"matcher": "Write|Edit|MultiEdit",
+			"hooks": []interface{}{
+				map[string]interface{}{"type": "command", "command": claudeHookCommand},
+			},
+		})
+		hooks["PostToolUse"] = postToolUse
+	}
+
+	sessionStartHasScribe := false
+	sessionStart, _ := hooks["SessionStart"].([]interface{})
+	for _, item := range sessionStart {
+		group, _ := item.(map[string]interface{})
+		for _, h := range asSlice(group["hooks"]) {
+			hmap, _ := h.(map[string]interface{})
+			if cmd, _ := hmap["command"].(string); strings.Contains(cmd, "scribe hook") {
+				sessionStartHasScribe = true
+			}
+		}
+	}
+	if !sessionStartHasScribe {
+		sessionStart = append(sessionStart, map[string]interface{}{
+			"hooks": []interface{}{
+				map[string]interface{}{"type": "command", "command": claudeHookCommand},
+			},
+		})
+		hooks["SessionStart"] = sessionStart
+	}
+
 	settings["hooks"] = hooks
 }
 

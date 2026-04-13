@@ -2,14 +2,16 @@ package pool
 
 import "time"
 
-// Entry is a single AI tool usage event added to the pool.
+// Entry is a single LLM tool usage event added to the pool.
 type Entry struct {
 	Timestamp time.Time `json:"timestamp"`
 	Vendor    string    `json:"vendor"` // e.g. "anthropic", "github"
 	Model     string    `json:"model"`  // e.g. "claude-sonnet-4-6"
+	SessionID string    `json:"session_id,omitempty"`
+	Payload   string    `json:"payload,omitempty"` // optional raw payload for debugging
 }
 
-// Pool accumulates AI tool usage events and can be drained when amending a
+// Pool accumulates LLM tool usage events and can be drained when amending a
 // commit. Implementations must be safe for concurrent use.
 type Pool interface {
 	// Add appends entries to the pool.

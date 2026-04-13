@@ -122,3 +122,17 @@ func TestParse_OnlyFirstLineIsConsumed(t *testing.T) {
 		t.Errorf("expected model from first line, got %q", entries[0].Model)
 	}
 }
+
+func TestParse_StoresSessionID(t *testing.T) {
+	input := `{"hook_event_name":"SessionStart","session_id":"sess-123","model":"claude-sonnet-4-6"}`
+	entries, err := parser.Parse(strings.NewReader(input), "anthropic", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].SessionID != "sess-123" {
+		t.Fatalf("expected session id sess-123, got %q", entries[0].SessionID)
+	}
+}

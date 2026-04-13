@@ -53,6 +53,7 @@ func (p *Parser) Parse(r io.Reader, _, fallbackModel string) ([]pool.Entry, erro
 			Timestamp: time.Now().UTC(),
 			Vendor:    vendor,
 			Model:     model,
+			Payload:   line,
 		}}, scanner.Err()
 	}
 	return nil, scanner.Err()

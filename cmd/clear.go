@@ -9,9 +9,9 @@ import (
 
 func newClearCmd(p pool.Pool, poolPath string) *cobra.Command {
 	return &cobra.Command{
-		Use:   "clear",
-		Short: "Clear the pool without amending",
-		Long:  `clear empties the pool. Use this to discard accumulated events without annotating a commit.`,
+		Use:          "clear",
+		Short:        "Clear the pool without amending",
+		Long:         `clear empties the pool. Use this to discard accumulated events without annotating a commit.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if poolPath == "" {
@@ -20,7 +20,7 @@ func newClearCmd(p pool.Pool, poolPath string) *cobra.Command {
 			if err := p.Clear(); err != nil {
 				return fmt.Errorf("clearing pool: %w", err)
 			}
-			fmt.Println("Pool cleared.")
+			fmt.Println("done")
 			return nil
 		},
 	}

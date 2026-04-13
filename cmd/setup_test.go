@@ -28,7 +28,17 @@ func TestClaudeHookPresent_HookAlreadyThere(t *testing.T) {
 					"hooks": []interface{}{
 						map[string]interface{}{
 							"type":    "command",
-							"command": "scribe hook --vendor anthropic",
+							"command": "scribe hook --vendor anthropic --format claude",
+						},
+					},
+				},
+			},
+			"SessionStart": []interface{}{
+				map[string]interface{}{
+					"hooks": []interface{}{
+						map[string]interface{}{
+							"type":    "command",
+							"command": "scribe hook --vendor anthropic --format claude",
 						},
 					},
 				},
@@ -77,6 +87,17 @@ func TestInjectClaudeHook_IntoEmpty(t *testing.T) {
 	if cmd != claudeHookCommand {
 		t.Errorf("unexpected command: %q", cmd)
 	}
+
+	sessionStart, _ := hooks["SessionStart"].([]interface{})
+	if len(sessionStart) != 1 {
+		t.Fatalf("expected 1 SessionStart entry, got %d", len(sessionStart))
+	}
+	sessionGroup := sessionStart[0].(map[string]interface{})
+	sessionHooks := sessionGroup["hooks"].([]interface{})
+	sessionCmd := sessionHooks[0].(map[string]interface{})["command"].(string)
+	if sessionCmd != claudeHookCommand {
+		t.Errorf("unexpected SessionStart command: %q", sessionCmd)
+	}
 }
 
 func TestInjectClaudeHook_PreservesExistingHooks(t *testing.T) {
@@ -87,6 +108,11 @@ func TestInjectClaudeHook_PreservesExistingHooks(t *testing.T) {
 					map[string]interface{}{"type": "command", "command": "other-tool"},
 				}},
 			},
+			"SessionStart": []interface{}{
+				map[string]interface{}{"hooks": []interface{}{
+					map[string]interface{}{"type": "command", "command": "other-start-tool"},
+				}},
+			},
 		},
 	}
 	injectClaudeHook(settings)
@@ -95,6 +121,36 @@ func TestInjectClaudeHook_PreservesExistingHooks(t *testing.T) {
 	postToolUse := hooks["PostToolUse"].([]interface{})
 	if len(postToolUse) != 2 {
 		t.Fatalf("expected 2 PostToolUse entries (existing + new), got %d", len(postToolUse))
+	}
+	sessionStart := hooks["SessionStart"].([]interface{})
+	if len(sessionStart) != 2 {
+		t.Fatalf("expected 2 SessionStart entries (existing + new), got %d", len(sessionStart))
+	}
+}
+
+func TestInjectClaudeHook_DoesNotDuplicateScribeHooks(t *testing.T) {
+	settings := map[string]interface{}{
+		"hooks": map[string]interface{}{
+			"PostToolUse": []interface{}{
+				map[string]interface{}{"hooks": []interface{}{
+					map[string]interface{}{"type": "command", "command": claudeHookCommand},
+				}},
+			},
+			"SessionStart": []interface{}{
+				map[string]interface{}{"hooks": []interface{}{
+					map[string]interface{}{"type": "command", "command": claudeHookCommand},
+				}},
+			},
+		},
+	}
+	injectClaudeHook(settings)
+
+	hooks := settings["hooks"].(map[string]interface{})
+	if got := len(hooks["PostToolUse"].([]interface{})); got != 1 {
+		t.Fatalf("expected PostToolUse hooks unchanged, got %d", got)
+	}
+	if got := len(hooks["SessionStart"].([]interface{})); got != 1 {
+		t.Fatalf("expected SessionStart hooks unchanged, got %d", got)
 	}
 }
 
