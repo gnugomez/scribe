@@ -25,12 +25,14 @@ Use --dry-run to preview without modifying the commit or clearing the pool.`,
 				noRepo()
 			}
 
+			out := cmd.OutOrStdout()
+
 			entries, err := p.Peek()
 			if err != nil {
 				return fmt.Errorf("reading pool: %w", err)
 			}
 			if len(entries) == 0 {
-				fmt.Println("Pool is empty — nothing to amend.")
+				fmt.Fprintln(out, "Pool is empty — nothing to amend.")
 				return nil
 			}
 
@@ -46,10 +48,10 @@ Use --dry-run to preview without modifying the commit or clearing the pool.`,
 			}
 
 			trailerValue := strings.Join(pairs, ", ")
-			fmt.Printf("Assisted-By: %s\n", trailerValue)
+			fmt.Fprintf(out, "Assisted-By: %s\n", trailerValue)
 
 			if dryRun {
-				fmt.Println("[dry-run] Commit not modified. Pool not cleared.")
+				fmt.Fprintln(out, "[dry-run] Commit not modified. Pool not cleared.")
 				return nil
 			}
 
@@ -59,7 +61,7 @@ Use --dry-run to preview without modifying the commit or clearing the pool.`,
 			if _, err := p.Drain(); err != nil {
 				return fmt.Errorf("clearing pool: %w", err)
 			}
-			fmt.Println("Commit amended. Pool cleared.")
+			fmt.Fprintln(out, "Commit amended. Pool cleared.")
 			return nil
 		},
 	}

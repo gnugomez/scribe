@@ -68,5 +68,8 @@ func resolveModel(fromPayload, fallback string) string {
 			return v
 		}
 	}
-	return fallback
+	if fallback != "" {
+		return fallback
+	}
+	return "copilot" // VS Code Copilot Chat does not expose the model in its hook payload
 }

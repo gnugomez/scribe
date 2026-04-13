@@ -33,7 +33,7 @@ as a fallback. This command always exits 0 so it never blocks the calling tool.`
 				return nil
 			}
 
-			entries, err := parser.Parse(os.Stdin, vendor, model)
+			entries, err := parser.Parse(cmd.InOrStdin(), vendor, model)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "scribe hook: parse error: %v\n", err)
 				return nil
