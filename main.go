@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jordi-jordi/scribe/cmd"
+	"github.com/gnugomez/scribe/cmd"
 )
 
 func main() {

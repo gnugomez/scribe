@@ -6,20 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jordi-jordi/scribe/internal/pool"
+	"github.com/gnugomez/scribe/store"
 )
 
-type errPeekPool struct {
+type errPeekStore struct {
 	err error
 }
 
-func (e *errPeekPool) Add(entries ...pool.Entry) error { return nil }
-func (e *errPeekPool) Peek() ([]pool.Entry, error)     { return nil, e.err }
-func (e *errPeekPool) Drain() ([]pool.Entry, error)    { return nil, nil }
-func (e *errPeekPool) Clear() error                    { return nil }
+func (e *errPeekStore) Add(entries ...store.Entry) error { return nil }
+func (e *errPeekStore) Peek() ([]store.Entry, error)     { return nil, e.err }
+func (e *errPeekStore) Drain() ([]store.Entry, error)    { return nil, nil }
+func (e *errPeekStore) Clear() error                     { return nil }
 
 func TestPool_PrintsEntries(t *testing.T) {
-	p := &mockPool{entries: []pool.Entry{{
+	p := &mockEditPool{entries: []store.Entry{{
 		Timestamp: time.Date(2026, time.April, 13, 12, 30, 31, 0, time.UTC),
 		Vendor:    "anthropic",
 		Model:     "claude",
@@ -45,11 +45,12 @@ func TestPool_PrintsEntries(t *testing.T) {
 }
 
 func TestPool_DebugPrettyPrintsPayload(t *testing.T) {
-	p := &mockPool{entries: []pool.Entry{{
-		Timestamp: time.Date(2026, time.April, 13, 12, 30, 31, 0, time.UTC),
-		Vendor:    "anthropic",
-		Model:     "claude",
-		Payload:   `{"hook_event_name":"PostToolUse","tool_name":"read_file"}`,
+	p := &mockEditPool{entries: []store.Entry{{
+		Timestamp:   time.Date(2026, time.April, 13, 12, 30, 31, 0, time.UTC),
+		Vendor:      "anthropic",
+		Model:       "claude",
+		ModelSource: "session",
+		Payload:     `{"hook_event_name":"PostToolUse","tool_name":"read_file"}`,
 	}}}
 
 	cmd := newPoolCmd(p, "/tmp/pool.jsonl")
@@ -66,13 +67,16 @@ func TestPool_DebugPrettyPrintsPayload(t *testing.T) {
 	if !strings.Contains(got, "payload:") {
 		t.Fatalf("expected payload section, got: %q", got)
 	}
+	if !strings.Contains(got, "model source: session") {
+		t.Fatalf("expected model source in debug output, got: %q", got)
+	}
 	if !strings.Contains(got, `"hook_event_name": "PostToolUse"`) {
 		t.Fatalf("expected pretty JSON payload, got: %q", got)
 	}
 }
 
 func TestPool_DebugFallsBackToRawPayloadForInvalidJSON(t *testing.T) {
-	p := &mockPool{entries: []pool.Entry{{
+	p := &mockEditPool{entries: []store.Entry{{
 		Timestamp: time.Date(2026, time.April, 13, 12, 30, 31, 0, time.UTC),
 		Vendor:    "anthropic",
 		Model:     "claude",
@@ -96,7 +100,7 @@ func TestPool_DebugFallsBackToRawPayloadForInvalidJSON(t *testing.T) {
 }
 
 func TestPool_PeekError(t *testing.T) {
-	cmd := newPoolCmd(&errPeekPool{err: errors.New("boom")}, "/tmp/pool.jsonl")
+	cmd := newPoolCmd(&errPeekStore{err: errors.New("boom")}, "/tmp/pool.jsonl")
 	var out strings.Builder
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)

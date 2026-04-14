@@ -4,26 +4,41 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jordi-jordi/scribe/internal/pool"
+	"github.com/gnugomez/scribe/store"
 )
 
-// --- mock pool ---
+// --- mock pools ---
 
-type mockPool struct {
-	entries  []pool.Entry
+type mockEditPool struct {
+	entries  []store.Entry
 	drained  bool
 	cleared  bool
 	addErr   error
 	drainErr error
 }
 
-func (m *mockPool) Add(entries ...pool.Entry) error {
+func (m *mockEditPool) Add(entries ...store.Entry) error {
 	m.entries = append(m.entries, entries...)
 	return m.addErr
 }
-func (m *mockPool) Peek() ([]pool.Entry, error)  { return m.entries, nil }
-func (m *mockPool) Drain() ([]pool.Entry, error) { m.drained = true; m.entries = nil; return m.entries, m.drainErr }
-func (m *mockPool) Clear() error                 { m.cleared = true; m.entries = nil; return nil }
+func (m *mockEditPool) Peek() ([]store.Entry, error) { return m.entries, nil }
+func (m *mockEditPool) Drain() ([]store.Entry, error) {
+	m.drained = true
+	got := m.entries
+	m.entries = nil
+	return got, m.drainErr
+}
+func (m *mockEditPool) Clear() error { m.cleared = true; m.entries = nil; return nil }
+
+type mockSessionPool struct {
+	entries []store.Entry
+}
+
+func (m *mockSessionPool) Add(entries ...store.Entry) error {
+	m.entries = append(m.entries, entries...)
+	return nil
+}
+func (m *mockSessionPool) Peek() ([]store.Entry, error) { return m.entries, nil }
 
 // --- mock git ---
 
@@ -41,14 +56,14 @@ func (m *mockGit) AmendTrailer(key, value string) error {
 
 // --- helpers ---
 
-func entry(vendor, model string) pool.Entry {
-	return pool.Entry{Vendor: vendor, Model: model}
+func entry(vendor, model string) store.Entry {
+	return store.Entry{Vendor: vendor, Model: model}
 }
 
 // --- tests ---
 
 func TestAmend_EmptyPool(t *testing.T) {
-	p := &mockPool{}
+	p := &mockEditPool{}
 	g := &mockGit{}
 	cmd := newAmendCmd(p, g, nil)
 
@@ -67,7 +82,7 @@ func TestAmend_EmptyPool(t *testing.T) {
 }
 
 func TestAmend_CallsGitAndDrainsPool(t *testing.T) {
-	p := &mockPool{entries: []pool.Entry{entry("anthropic", "claude-sonnet-4-6")}}
+	p := &mockEditPool{entries: []store.Entry{entry("anthropic", "claude-sonnet-4-6")}}
 	g := &mockGit{}
 	cmd := newAmendCmd(p, g, nil)
 	cmd.SetOut(&strings.Builder{})
@@ -88,7 +103,7 @@ func TestAmend_CallsGitAndDrainsPool(t *testing.T) {
 }
 
 func TestAmend_DeduplicatesPairs(t *testing.T) {
-	p := &mockPool{entries: []pool.Entry{
+	p := &mockEditPool{entries: []store.Entry{
 		entry("anthropic", "claude-sonnet-4-6"),
 		entry("github", "gpt-4o"),
 		entry("anthropic", "claude-sonnet-4-6"), // duplicate
@@ -107,7 +122,7 @@ func TestAmend_DeduplicatesPairs(t *testing.T) {
 }
 
 func TestAmend_DryRun_DoesNotAmendOrClear(t *testing.T) {
-	p := &mockPool{entries: []pool.Entry{entry("anthropic", "claude-sonnet-4-6")}}
+	p := &mockEditPool{entries: []store.Entry{entry("anthropic", "claude-sonnet-4-6")}}
 	g := &mockGit{}
 	cmd := newAmendCmd(p, g, nil)
 	cmd.SetArgs([]string{"--dry-run"})
@@ -126,7 +141,7 @@ func TestAmend_DryRun_DoesNotAmendOrClear(t *testing.T) {
 }
 
 func TestAmend_PreservesInsertionOrder(t *testing.T) {
-	p := &mockPool{entries: []pool.Entry{
+	p := &mockEditPool{entries: []store.Entry{
 		entry("github", "gpt-4o"),
 		entry("anthropic", "claude-sonnet-4-6"),
 	}}

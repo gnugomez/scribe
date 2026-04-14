@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/jordi-jordi/scribe/internal/pool"
+	"github.com/gnugomez/scribe/store"
 	"github.com/spf13/cobra"
 )
 
-func newPoolCmd(p pool.Pool, poolPath string) *cobra.Command {
+func newPoolCmd(p store.EditPool, storePath string) *cobra.Command {
 	var debug bool
 
 	cmd := &cobra.Command{
@@ -20,7 +20,7 @@ func newPoolCmd(p pool.Pool, poolPath string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
 
-			if poolPath == "" {
+			if storePath == "" {
 				noRepo()
 			}
 
@@ -39,6 +39,9 @@ func newPoolCmd(p pool.Pool, poolPath string) *cobra.Command {
 					e.Vendor, e.Model,
 				)
 				if debug {
+					if e.ModelSource != "" {
+						fmt.Fprintf(out, "  model source: %s\n", e.ModelSource)
+					}
 					fmt.Fprint(out, formatPayloadDebug(e.Payload))
 				}
 			}

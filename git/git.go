@@ -30,11 +30,16 @@ func RepoRoot() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// PoolPath returns the path where scribe stores its pool file for the repo
-// rooted at root. The file lives inside .git/ so it is never committed and
-// requires no .gitignore entry.
+// PoolPath returns the path for per-commit tool usage events for the repo
+// rooted at root. Cleared on each amend/clear.
 func PoolPath(root string) string {
 	return filepath.Join(root, ".git", "scribe", "pool.jsonl")
+}
+
+// SessionPath returns the path for session model data. This file is never
+// cleared so session model lookups survive amend/clear cycles.
+func SessionPath(root string) string {
+	return filepath.Join(root, ".git", "scribe", "sessions.jsonl")
 }
 
 // AmendTrailer runs git commit --amend --no-edit --trailer "key: value".

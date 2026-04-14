@@ -5,19 +5,19 @@ import (
 	"io"
 	"sort"
 
-	"github.com/jordi-jordi/scribe/internal/pool"
+	"github.com/gnugomez/scribe/store"
 )
 
-// Parser parses a hook payload from a specific LLM tool and returns pool
+// Parser parses a hook payload from a specific LLM tool and returns store
 // entries to record. Implementations self-register via init().
 type Parser interface {
 	// Name returns the unique format identifier (e.g. "claude", "copilot").
 	Name() string
 
-	// Parse reads the hook payload from r and returns entries to add to the
-	// pool. fallbackVendor and fallbackModel are used when the payload does
-	// not contain that information.
-	Parse(r io.Reader, fallbackVendor, fallbackModel string) ([]pool.Entry, error)
+	// Parse reads the hook payload from r and returns entries to record.
+	// fallbackVendor and fallbackModel are used when the payload does not
+	// contain that information.
+	Parse(r io.Reader, fallbackVendor, fallbackModel string) ([]store.Entry, error)
 }
 
 var registry = map[string]Parser{}

@@ -1,13 +1,13 @@
-package claudecode_test
+package hook_test
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/jordi-jordi/scribe/internal/hook/claudecode"
+	claudeParser "github.com/gnugomez/scribe/hook/claude"
 )
 
-var parser = &claudecode.Parser{}
+var parser = &claudeParser.Parser{}
 
 func TestParse_ModelFromPayload(t *testing.T) {
 	input := `{"tool_name":"Write","tool_input":{"file_path":"/tmp/a.ts"},"model":"claude-sonnet-4-6"}`
@@ -21,31 +21,15 @@ func TestParse_ModelFromPayload(t *testing.T) {
 	if entries[0].Model != "claude-sonnet-4-6" {
 		t.Errorf("expected model from payload, got %q", entries[0].Model)
 	}
+	if entries[0].ModelSource != "payload" {
+		t.Errorf("expected model source payload, got %q", entries[0].ModelSource)
+	}
 	if entries[0].Vendor != "anthropic" {
 		t.Errorf("expected vendor anthropic, got %q", entries[0].Vendor)
 	}
 }
 
-func TestParse_ModelFromEnv(t *testing.T) {
-	t.Setenv("CLAUDE_MODEL", "claude-opus-4-6")
-
-	input := `{"tool_name":"Write","tool_input":{"file_path":"/tmp/a.ts"}}`
-	entries, err := parser.Parse(strings.NewReader(input), "anthropic", "fallback-model")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(entries))
-	}
-	if entries[0].Model != "claude-opus-4-6" {
-		t.Errorf("expected model from env, got %q", entries[0].Model)
-	}
-}
-
 func TestParse_ModelFromFallbackFlag(t *testing.T) {
-	// Ensure env var is not set.
-	t.Setenv("CLAUDE_MODEL", "")
-
 	input := `{"tool_name":"Write","tool_input":{"file_path":"/tmp/a.ts"}}`
 	entries, err := parser.Parse(strings.NewReader(input), "anthropic", "my-fallback")
 	if err != nil {
@@ -57,18 +41,19 @@ func TestParse_ModelFromFallbackFlag(t *testing.T) {
 	if entries[0].Model != "my-fallback" {
 		t.Errorf("expected fallback model, got %q", entries[0].Model)
 	}
+	if entries[0].ModelSource != "flag" {
+		t.Errorf("expected model source flag, got %q", entries[0].ModelSource)
+	}
 }
 
-func TestParse_PayloadModelTakesPriorityOverEnv(t *testing.T) {
-	t.Setenv("CLAUDE_MODEL", "env-model")
-
+func TestParse_PayloadModelTakesPriorityOverFlag(t *testing.T) {
 	input := `{"model":"payload-model"}`
 	entries, err := parser.Parse(strings.NewReader(input), "anthropic", "fallback")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if entries[0].Model != "payload-model" {
-		t.Errorf("payload model should win over env, got %q", entries[0].Model)
+		t.Errorf("payload model should win over flag fallback, got %q", entries[0].Model)
 	}
 }
 
@@ -95,7 +80,6 @@ func TestParse_BlankLines(t *testing.T) {
 func TestParse_MalformedJSON_StillProducesEntry(t *testing.T) {
 	// Malformed JSON means model falls through to fallback — we still record
 	// an event because the hook fired (the LLM was used).
-	t.Setenv("CLAUDE_MODEL", "")
 	entries, err := parser.Parse(strings.NewReader("{not-json}"), "anthropic", "fallback")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -134,5 +118,19 @@ func TestParse_StoresSessionID(t *testing.T) {
 	}
 	if entries[0].SessionID != "sess-123" {
 		t.Fatalf("expected session id sess-123, got %q", entries[0].SessionID)
+	}
+	if entries[0].EventName != "SessionStart" {
+		t.Errorf("expected EventName=SessionStart, got %q", entries[0].EventName)
+	}
+}
+
+func TestParse_PostToolUseEventName(t *testing.T) {
+	input := `{"hook_event_name":"PostToolUse","session_id":"sess-123","tool_name":"Write"}`
+	entries, err := parser.Parse(strings.NewReader(input), "anthropic", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if entries[0].EventName != "PostToolUse" {
+		t.Errorf("expected EventName=PostToolUse, got %q", entries[0].EventName)
 	}
 }

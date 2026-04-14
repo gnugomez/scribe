@@ -6,24 +6,21 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jordi-jordi/scribe/internal/pool"
+	"github.com/gnugomez/scribe/store"
 )
 
-// Pool is a JSONL-backed pool stored at <repo>/.git/scribe/pool.jsonl.
-// Each line is a JSON-encoded pool.Entry. Drain reads and then truncates
-// the file. The path is injected so the pool stays decoupled from git.
+// Pool is a JSONL-backed pool. Each line is a JSON-encoded store.Entry.
+// It satisfies both store.EditPool and store.SessionPool.
 type Pool struct {
 	path string
 }
 
 // NewPool returns a Pool that writes to path.
-// Call with the value returned by git.PoolPath().
 func NewPool(path string) *Pool {
 	return &Pool{path: path}
 }
 
-// Add appends entries to the pool file.
-func (p *Pool) Add(entries ...pool.Entry) error {
+func (p *Pool) Add(entries ...store.Entry) error {
 	if err := os.MkdirAll(filepath.Dir(p.path), 0o755); err != nil {
 		return err
 	}
@@ -32,7 +29,6 @@ func (p *Pool) Add(entries ...pool.Entry) error {
 		return err
 	}
 	defer f.Close()
-
 	enc := json.NewEncoder(f)
 	for _, e := range entries {
 		if err := enc.Encode(e); err != nil {
@@ -42,13 +38,11 @@ func (p *Pool) Add(entries ...pool.Entry) error {
 	return nil
 }
 
-// Peek returns the current pool contents without modifying the file.
-func (p *Pool) Peek() ([]pool.Entry, error) {
+func (p *Pool) Peek() ([]store.Entry, error) {
 	return p.readAll()
 }
 
-// Drain returns all entries and clears the pool file.
-func (p *Pool) Drain() ([]pool.Entry, error) {
+func (p *Pool) Drain() ([]store.Entry, error) {
 	entries, err := p.readAll()
 	if err != nil {
 		return nil, err
@@ -61,7 +55,6 @@ func (p *Pool) Drain() ([]pool.Entry, error) {
 	return entries, nil
 }
 
-// Clear truncates the pool file.
 func (p *Pool) Clear() error {
 	if _, err := os.Stat(p.path); os.IsNotExist(err) {
 		return nil
@@ -69,7 +62,7 @@ func (p *Pool) Clear() error {
 	return os.Truncate(p.path, 0)
 }
 
-func (p *Pool) readAll() ([]pool.Entry, error) {
+func (p *Pool) readAll() ([]store.Entry, error) {
 	f, err := os.Open(p.path)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -79,14 +72,14 @@ func (p *Pool) readAll() ([]pool.Entry, error) {
 	}
 	defer f.Close()
 
-	var entries []pool.Entry
+	var entries []store.Entry
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
 			continue
 		}
-		var e pool.Entry
+		var e store.Entry
 		if err := json.Unmarshal([]byte(line), &e); err != nil {
 			continue // skip malformed lines
 		}
