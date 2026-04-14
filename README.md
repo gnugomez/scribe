@@ -1,6 +1,4 @@
-# scribe
-
-> Tool usage tracking for your git commits.
+# scribe 🪶
 
 `scribe` maintains a **per-repo pool** of tool usage events. Each time the harness invokes a tool, a hook adds an entry to the pool.
 
@@ -20,28 +18,25 @@ go install github.com/gnugomez/scribe@latest
 
 ## Usage
 
+In order to capture tool usage, you need to set up hooks for your AI tools (see below). Once that's done, the typical workflow is:
+
+Just run `scribe amend` after your commit to annotate it with the tools you used. This is a manual step so you can choose which commits to annotate and when.
+
 ```bash
-# See what's in the pool right now
-scribe pool
-
-# Show full hook payload details for debugging
-scribe pool --debug
-
-# Preview the Assisted-By trailer without modifying anything
-scribe amend --dry-run
-
-# Amend HEAD with the trailer and clear the pool
 scribe amend
+```
+This could be paired with pre-commit hooks.
 
-# Discard pool without amending (e.g. after a commit you don't want to annotate)
-scribe clear
+
+Some other useful commands:
+
+```bash
+scribe amend --dry-run   # Preview the annotation without clearing the pool
+scribe pool # View the list of captured tool events in the pool
+scribe clear # Discard pool without amending
 ```
 
 ---
-
-## Tool Configuration
-
-  `scribe` no longer includes a `setup` command. Configuration is intentionally manual and copy-pasteable.
 
 ### Claude Code CLI
 
@@ -82,28 +77,39 @@ scribe clear
 
 ### GitHub Copilot Chat
 
+> [!WARNING]
+> Right now there's an open issue where SessionStart hooks aren't following the specification, not including the `model`, [details here](https://github.com/microsoft/vscode/issues/309510)
+
 VS Code Copilot Chat supports **Agent Hooks** (preview) that fire when the agent uses tools.
 
-Add to your user or workspace `settings.json`:
+Create `.copilot/hooks/scribe.json` in your repo or globally at `~/.copilot/hooks/scribe.json` with the following content:
 
 ```json
 {
-  "github.copilot.agent.hooks": {
-    "postToolUse": {
-      "command": "scribe hook --vendor github --format copilot"
-    },
-    "sessionStart": {
-      "command": "scribe hook --vendor github --format copilot"
-    }
+  "hooks": {
+    "PostToolUse": [
+      {
+        "command": "scribe hook --vendor github --format copilot",
+        "type": "command"
+      }
+    ],
+    "SessionStart": [
+      {
+        "command": "scribe hook --vendor github --format copilot",
+        "type": "command"
+      }
+    ]
   }
 }
 ```
 
-`scribe` reads the model from the payload. If a `postToolUse` payload doesn't include a model, `scribe` will reuse the latest known model from that same `session_id`.
+`scribe` reads the model from the payload. If a `PostToolUse` payload doesn't include a model, `scribe` will reuse the latest known model from that same `session_id`.
 
-> **Warning:** Copilot hook payloads may not always include model metadata. To improve attribution, configure a `sessionStart` hook so `scribe` can reuse the model seen at session start when later tool events omit it.
+> [!WARNING]
+> Copilot hook payloads may not always include model metadata. The `SessionStart` hook lets `scribe` capture the model at session start so it can be reused when later tool events omit it.
 
-> **Note:** The VS Code Agent Hooks API is in preview. See the [VS Code Copilot hooks documentation](https://code.visualstudio.com/docs/copilot/customization/hooks) for the latest config format and payload schema.
+> [!NOTE]
+> The VS Code Agent Hooks API is in preview. See the [VS Code Copilot hooks documentation](https://code.visualstudio.com/docs/copilot/customization/hooks) for the latest config format and payload schema.
 
 ---
 
