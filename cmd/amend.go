@@ -50,7 +50,7 @@ Use --dry-run to preview without modifying the commit or clearing the pool.`,
 			if _, err := p.Drain(); err != nil {
 				return fmt.Errorf("clearing pool: %w", err)
 			}
-			fmt.Fprintf(out, "Assisted-By: %s  %s\n", trailerValue, green("done"))
+			fmt.Fprintf(out, "Assisted-By: %s  %s\n", trailerValue, success("done"))
 			return nil
 		},
 	}

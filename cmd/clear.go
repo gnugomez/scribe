@@ -17,10 +17,11 @@ func newClearCmd(p store.EditPool, storePath string) *cobra.Command {
 			if storePath == "" {
 				noRepo()
 			}
-			if err := p.Clear(); err != nil {
+			entries, err := p.Drain()
+			if err != nil {
 				return fmt.Errorf("clearing pool: %w", err)
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), green("done"))
+			fmt.Fprintf(cmd.OutOrStdout(), "cleared %s  %s\n", bold(fmt.Sprintf("%d entries", len(entries))), success("done"))
 			return nil
 		},
 	}

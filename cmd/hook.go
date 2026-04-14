@@ -46,28 +46,7 @@ This command always exits 0 so it never blocks the calling tool.`,
 				return nil
 			}
 
-			// Route: session events go to sessionPool (never cleared);
-			// edit events go to editPool after session-model enrichment.
-			var editEntries []store.Entry
-			for _, e := range entries {
-				if e.EventName == "SessionStart" {
-					if err := sessionPool.Add(e); err != nil {
-						fmt.Fprintf(os.Stderr, "scribe hook: session pool error: %v\n", err)
-					}
-				} else {
-					editEntries = append(editEntries, e)
-				}
-			}
-
-			if len(editEntries) == 0 {
-				return nil
-			}
-
-			enrichEntriesWithSessionModel(sessionPool, editEntries)
-
-			if err := editPool.Add(editEntries...); err != nil {
-				fmt.Fprintf(os.Stderr, "scribe hook: pool error: %v\n", err)
-			}
+			routeEntries(entries, editPool, sessionPool)
 			return nil
 		},
 	}
@@ -113,4 +92,26 @@ func sessionKey(vendor, sessionID string) string {
 
 func isUnknownModel(model string) bool {
 	return model == "" || model == "claude" || model == "copilot"
+}
+
+// routeEntries sends SessionStart events to sessionPool and all other events
+// to editPool, enriching them with the session-derived model first.
+func routeEntries(entries []store.Entry, editPool store.EditPool, sessionPool store.SessionPool) {
+	var editEntries []store.Entry
+	for _, e := range entries {
+		if e.EventName == "SessionStart" {
+			if err := sessionPool.Add(e); err != nil {
+				fmt.Fprintf(os.Stderr, "scribe hook: session pool error: %v\n", err)
+			}
+		} else {
+			editEntries = append(editEntries, e)
+		}
+	}
+	if len(editEntries) == 0 {
+		return
+	}
+	enrichEntriesWithSessionModel(sessionPool, editEntries)
+	if err := editPool.Add(editEntries...); err != nil {
+		fmt.Fprintf(os.Stderr, "scribe hook: pool error: %v\n", err)
+	}
 }
