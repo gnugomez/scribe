@@ -52,6 +52,7 @@ the current commit with an Assisted-By trailer.`,
 		newAmendCmd(editPool, gitClient, repoErr, poolHeadPath, git.HeadHash),
 		newPoolCmd(editPool, poolPath),
 		newClearCmd(editPool, poolPath, poolHeadPath),
+		newStatusCmd(editPool, repoErr),
 	)
 
 	return root.Execute()
