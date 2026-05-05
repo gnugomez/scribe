@@ -77,9 +77,6 @@ scribe clear # Discard pool without amending
 
 ### GitHub Copilot Chat
 
-> [!WARNING]
-> Right now there's an open issue where SessionStart hooks aren't following the specification, not including the `model`, [details here](https://github.com/microsoft/vscode/issues/309510)
-
 VS Code Copilot Chat supports **Agent Hooks** (preview) that fire when the agent uses tools.
 
 Create `.copilot/hooks/scribe.json` in your repo or globally at `~/.copilot/hooks/scribe.json` with the following content:
