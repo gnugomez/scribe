@@ -16,13 +16,15 @@ import (
 // Execute builds the command tree and runs it.
 func Execute() error {
 	root := &cobra.Command{
-		Use:   "scribe",
-		Short: "Track tool usage and annotate git commits with Assisted-By trailers",
+		Use:     "scribe",
+		Version: buildVersion(),
+		Short:   "Track tool usage and annotate git commits with Assisted-By trailers",
 		Long: `scribe maintains a per-repo pool of tool usage events.
 Each time the harness invokes a tool, a hook
 adds an entry to the pool. Run 'scribe amend' to drain the pool and annotate
 the current commit with an Assisted-By trailer.`,
 	}
+	root.SetVersionTemplate("scribe {{.Version}}\n")
 
 	// Resolve git repo root and store paths. Commands that need git context
 	// will fail gracefully if not in a repo.

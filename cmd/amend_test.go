@@ -233,10 +233,10 @@ func TestAmend_FreshPool_AmendsNormally(t *testing.T) {
 //
 // Timeline that triggers this:
 //
-//	1. make commit (HEAD = A)
-//	2. use AI tools → entries in pool, pool-head = A
-//	3. git commit --amend --no-edit   ← only fixes something unrelated; HEAD = A'
-//	4. scribe amend → detects A ≠ A', clears the pool → Assisted-By never added
+//  1. make commit (HEAD = A)
+//  2. use AI tools → entries in pool, pool-head = A
+//  3. git commit --amend --no-edit   ← only fixes something unrelated; HEAD = A'
+//  4. scribe amend → detects A ≠ A', clears the pool → Assisted-By never added
 func TestAmend_StaleDetection_FalsePositive_ManualGitAmend(t *testing.T) {
 	_, headPath := headFile(t, "hash-before-manual-amend")
 	p := &mockEditPool{entries: []store.Entry{entry("anthropic", "claude-sonnet-4-6")}}
