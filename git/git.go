@@ -30,10 +30,36 @@ func RepoRoot() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// PoolPath returns the path for per-commit tool usage events for the repo
-// rooted at root. Cleared on each amend/clear.
-func PoolPath(root string) string {
-	return filepath.Join(root, ".git", "scribe", "pool.jsonl")
+// CurrentBranch returns the name of the currently checked-out branch.
+// Returns "HEAD" when in detached HEAD state.
+func CurrentBranch() (string, error) {
+	out, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
+	if err != nil {
+		return "", fmt.Errorf("could not determine current branch")
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// PoolPath returns the path for per-commit tool usage events for the given
+// branch in the repo rooted at root. Cleared on each amend/clear.
+// Branch names with slashes (e.g. "feature/x") become subdirectories.
+func PoolPath(root, branch string) string {
+	return filepath.Join(root, ".git", "scribe", branch, "pool.jsonl")
+}
+
+// PoolHeadPath returns the path to the sentinel file that records the HEAD
+// commit hash at the time the pool was last written. Lives alongside the pool.
+func PoolHeadPath(poolPath string) string {
+	return filepath.Join(filepath.Dir(poolPath), "pool-head")
+}
+
+// HeadHash returns the SHA-1 hash of the current HEAD commit.
+func HeadHash() (string, error) {
+	out, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return "", fmt.Errorf("could not determine HEAD hash")
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // SessionPath returns the path for session model data. This file is never

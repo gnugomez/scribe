@@ -13,7 +13,7 @@ import (
 
 // hookCmd is a convenience helper for tests that don't need a pre-seeded session store.
 func hookCmd(edit, session *mockEditPool, payload, format, vendor string) error {
-	cmd := newHookCmd(edit, session, "/fake/pool/path")
+	cmd := newHookCmd(edit, session, "/fake/pool/path", "", nil)
 	cmd.SetIn(strings.NewReader(payload))
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
@@ -26,7 +26,7 @@ func TestHook_AddsToPool_ClaudeCode(t *testing.T) {
 	session := &mockEditPool{}
 	stdin := strings.NewReader(`{"tool_name":"Write","model":"claude-sonnet-4-6"}`)
 
-	cmd := newHookCmd(edit, session, "/fake/pool/path")
+	cmd := newHookCmd(edit, session, "/fake/pool/path", "", nil)
 	cmd.SetIn(stdin)
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
@@ -51,7 +51,7 @@ func TestHook_AddsToPool_Copilot(t *testing.T) {
 	session := &mockEditPool{}
 	stdin := strings.NewReader(`{"model":"gpt-4o","tool":"editFile"}`)
 
-	cmd := newHookCmd(edit, session, "/fake/pool/path")
+	cmd := newHookCmd(edit, session, "/fake/pool/path", "", nil)
 	cmd.SetIn(stdin)
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
@@ -72,7 +72,7 @@ func TestHook_OutsideRepo_ExitsCleanly(t *testing.T) {
 	edit := &mockEditPool{}
 	session := &mockEditPool{}
 
-	cmd := newHookCmd(edit, session, "")
+	cmd := newHookCmd(edit, session, "", "", nil)
 	cmd.SetIn(strings.NewReader(`{"model":"claude-sonnet-4-6"}`))
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
@@ -90,7 +90,7 @@ func TestHook_UnknownFormat_ExitsCleanly(t *testing.T) {
 	edit := &mockEditPool{}
 	session := &mockEditPool{}
 
-	cmd := newHookCmd(edit, session, "/fake/pool/path")
+	cmd := newHookCmd(edit, session, "/fake/pool/path", "", nil)
 	cmd.SetIn(strings.NewReader(`{}`))
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
@@ -108,7 +108,7 @@ func TestHook_EmptyPayload_AddsNothing(t *testing.T) {
 	edit := &mockEditPool{}
 	session := &mockEditPool{}
 
-	cmd := newHookCmd(edit, session, "/fake/pool/path")
+	cmd := newHookCmd(edit, session, "/fake/pool/path", "", nil)
 	cmd.SetIn(strings.NewReader(""))
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
@@ -126,7 +126,7 @@ func TestHook_FallbackModelFromFlag(t *testing.T) {
 	edit := &mockEditPool{}
 	session := &mockEditPool{}
 
-	cmd := newHookCmd(edit, session, "/fake/pool/path")
+	cmd := newHookCmd(edit, session, "/fake/pool/path", "", nil)
 	cmd.SetIn(strings.NewReader(`{"tool_name":"Write"}`))
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
@@ -149,7 +149,7 @@ func TestHook_SessionStartGoesToSessionStore(t *testing.T) {
 	edit := &mockEditPool{}
 	session := &mockEditPool{}
 
-	cmd := newHookCmd(edit, session, "/fake/pool/path")
+	cmd := newHookCmd(edit, session, "/fake/pool/path", "", nil)
 	cmd.SetIn(strings.NewReader(`{"hook_event_name":"SessionStart","session_id":"abc-123","model":"claude-sonnet-4-6"}`))
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
@@ -183,7 +183,7 @@ func TestHook_UsesSessionModelWhenPostToolUseHasNoModel(t *testing.T) {
 	}}}
 	edit := &mockEditPool{}
 
-	cmd := newHookCmd(edit, session, "/fake/pool/path")
+	cmd := newHookCmd(edit, session, "/fake/pool/path", "", nil)
 	cmd.SetIn(strings.NewReader(`{"hook_event_name":"PostToolUse","session_id":"sess-42","tool_name":"Read","tool_input":{}}`))
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
@@ -211,7 +211,7 @@ func TestHook_SessionModelSurvivesDrain(t *testing.T) {
 	session := &mockEditPool{}
 
 	run := func(payload string) {
-		cmd := newHookCmd(edit, session, "/fake/pool/path")
+		cmd := newHookCmd(edit, session, "/fake/pool/path", "", nil)
 		cmd.SetIn(strings.NewReader(payload))
 		cmd.SetOut(&strings.Builder{})
 		cmd.SetErr(&strings.Builder{})
@@ -258,7 +258,7 @@ func TestHook_DoesNotMixSessionModelAcrossVendors(t *testing.T) {
 	}}}
 	edit := &mockEditPool{}
 
-	cmd := newHookCmd(edit, session, "/fake/pool/path")
+	cmd := newHookCmd(edit, session, "/fake/pool/path", "", nil)
 	cmd.SetIn(strings.NewReader(`{"hook_event_name":"PostToolUse","session_id":"shared-session","tool_name":"Read"}`))
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})

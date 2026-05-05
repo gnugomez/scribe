@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newAmendCmd(p store.EditPool, g git.Git, repoErr error) *cobra.Command {
+func newAmendCmd(p store.EditPool, g git.Git, repoErr error, headPath string, headHashFn func() (string, error)) *cobra.Command {
 	var dryRun bool
 
 	cmd := &cobra.Command{
@@ -26,6 +26,16 @@ Use --dry-run to preview without modifying the commit or clearing the pool.`,
 			}
 
 			out := cmd.OutOrStdout()
+
+			// If HEAD has changed since the pool was last written (e.g. after a
+			// hard reset to a different commit), the entries are stale — clear
+			// them rather than annotating the new commit with old tool usage.
+			if headPath != "" && poolIsStale(headPath, headHashFn) {
+				_ = p.Clear()
+				removePoolHead(headPath)
+				fmt.Fprintln(out, "pool empty")
+				return nil
+			}
 
 			entries, err := p.Peek()
 			if err != nil {
@@ -50,6 +60,7 @@ Use --dry-run to preview without modifying the commit or clearing the pool.`,
 			if _, err := p.Drain(); err != nil {
 				return fmt.Errorf("clearing pool: %w", err)
 			}
+			removePoolHead(headPath)
 			fmt.Fprintf(out, "Assisted-By: %s  %s\n", trailerValue, success("done"))
 			return nil
 		},

@@ -8,7 +8,7 @@ Run `scribe amend` to drain the pool and annotate the current commit with:
 Assisted-By: anthropic:claude-sonnet-4-6, github:gpt-4o
 ```
 
-The pool is stored at `.git/scribe/pool.jsonl` — local to the repo, inside `.git/` so it is never committed and requires no `.gitignore` entry.
+The pool is stored at `.git/scribe/<branch>/pool.jsonl` — scoped to the current branch, local to the repo, inside `.git/` so it is never committed and requires no `.gitignore` entry.
 
 ## Installation
 
@@ -113,6 +113,17 @@ Create `.copilot/hooks/scribe.json` in your repo or globally at `~/.copilot/hook
 
 ---
 
+## Pool isolation
+
+The pool is **branch-scoped** — each branch gets its own pool file at `.git/scribe/<branch>/pool.jsonl`. Checking out a different branch automatically uses that branch's pool, so tool usage from one branch never leaks into another.
+
+The pool also carries a **HEAD sentinel** (`.git/scribe/<branch>/pool-head`) that records the commit hash when entries were last written. If HEAD changes between the last tool event and `scribe amend` — for example after `git reset --hard` or `git checkout <other-commit>` — the pool is automatically discarded rather than applied to the wrong commit.
+
+> [!NOTE]
+> One known false positive: if you run `git commit --amend` yourself (e.g. to fix a typo in the commit message) *before* running `scribe amend`, the sentinel detects a hash change and will discard the pool. In that case, re-run your AI session or use `scribe amend` immediately after each commit.
+
+---
+
 ## Workflow
 
 ```
@@ -143,7 +154,7 @@ The core (`cmd/amend.go`, `cmd/hook.go`) never needs to change.
 
 ## Pool file
 
-  `.git/scribe/pool.jsonl` — one JSON object per line:
+`.git/scribe/<branch>/pool.jsonl` — one JSON object per line:
 
 ```json
 {"timestamp":"2026-04-13T10:00:00Z","vendor":"anthropic","model":"claude-sonnet-4-6"}
