@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -67,7 +65,7 @@ func entry(vendor, model string) store.Entry {
 func TestAmend_EmptyPool(t *testing.T) {
 	p := &mockEditPool{}
 	g := &mockGit{}
-	cmd := newAmendCmd(p, g, nil, "", nil)
+	cmd := newAmendCmd(p, g, nil)
 
 	var out strings.Builder
 	cmd.SetOut(&out)
@@ -86,7 +84,7 @@ func TestAmend_EmptyPool(t *testing.T) {
 func TestAmend_CallsGitAndDrainsPool(t *testing.T) {
 	p := &mockEditPool{entries: []store.Entry{entry("anthropic", "claude-sonnet-4-6")}}
 	g := &mockGit{}
-	cmd := newAmendCmd(p, g, nil, "", nil)
+	cmd := newAmendCmd(p, g, nil)
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
 
@@ -111,7 +109,7 @@ func TestAmend_DeduplicatesPairs(t *testing.T) {
 		entry("anthropic", "claude-sonnet-4-6"), // duplicate
 	}}
 	g := &mockGit{}
-	cmd := newAmendCmd(p, g, nil, "", nil)
+	cmd := newAmendCmd(p, g, nil)
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
 
@@ -126,7 +124,7 @@ func TestAmend_DeduplicatesPairs(t *testing.T) {
 func TestAmend_DryRun_DoesNotAmendOrClear(t *testing.T) {
 	p := &mockEditPool{entries: []store.Entry{entry("anthropic", "claude-sonnet-4-6")}}
 	g := &mockGit{}
-	cmd := newAmendCmd(p, g, nil, "", nil)
+	cmd := newAmendCmd(p, g, nil)
 	cmd.SetArgs([]string{"--dry-run"})
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
@@ -148,7 +146,7 @@ func TestAmend_PreservesInsertionOrder(t *testing.T) {
 		entry("anthropic", "claude-sonnet-4-6"),
 	}}
 	g := &mockGit{}
-	cmd := newAmendCmd(p, g, nil, "", nil)
+	cmd := newAmendCmd(p, g, nil)
 	cmd.SetOut(&strings.Builder{})
 	cmd.SetErr(&strings.Builder{})
 
@@ -157,106 +155,5 @@ func TestAmend_PreservesInsertionOrder(t *testing.T) {
 	}
 	if g.value != "github:gpt-4o, anthropic:claude-sonnet-4-6" {
 		t.Errorf("expected insertion order preserved, got: %q", g.value)
-	}
-}
-
-// --- stale-pool guard tests ---
-
-// headFile creates a temp sentinel file containing the given hash and returns
-// the dir and file path.
-func headFile(t *testing.T, hash string) (dir, path string) {
-	t.Helper()
-	dir = t.TempDir()
-	path = filepath.Join(dir, "pool-head")
-	if err := os.WriteFile(path, []byte(hash), 0o644); err != nil {
-		t.Fatalf("writing pool-head: %v", err)
-	}
-	return dir, path
-}
-
-func hashFn(hash string) func() (string, error) {
-	return func() (string, error) { return hash, nil }
-}
-
-// TestAmend_StalePool_ClearsEntries verifies the primary use-case: a
-// hard-reset changed HEAD, so stale pool entries must not be applied.
-func TestAmend_StalePool_ClearsEntries(t *testing.T) {
-	_, headPath := headFile(t, "old-hash")
-	p := &mockEditPool{entries: []store.Entry{entry("anthropic", "claude-sonnet-4-6")}}
-	g := &mockGit{}
-
-	var out strings.Builder
-	cmd := newAmendCmd(p, g, nil, headPath, hashFn("current-hash"))
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if g.key != "" {
-		t.Error("expected no git amend when pool is stale")
-	}
-	if !p.cleared {
-		t.Error("expected pool to be cleared when stale")
-	}
-	if !strings.Contains(out.String(), "pool empty") {
-		t.Errorf("expected 'pool empty' in output, got: %q", out.String())
-	}
-}
-
-// TestAmend_FreshPool_AmendsNormally verifies that a matching sentinel does
-// not interfere with the normal amend path.
-func TestAmend_FreshPool_AmendsNormally(t *testing.T) {
-	_, headPath := headFile(t, "current-hash")
-	p := &mockEditPool{entries: []store.Entry{entry("anthropic", "claude-sonnet-4-6")}}
-	g := &mockGit{}
-
-	cmd := newAmendCmd(p, g, nil, headPath, hashFn("current-hash"))
-	cmd.SetOut(&strings.Builder{})
-	cmd.SetErr(&strings.Builder{})
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if g.key != "Assisted-By" {
-		t.Errorf("expected git amend on fresh pool, got key=%q", g.key)
-	}
-	if !p.drained {
-		t.Error("expected pool to be drained after successful amend")
-	}
-}
-
-// TestAmend_StaleDetection_FalsePositive_ManualGitAmend documents a known
-// false positive: pool entries accumulated for a commit are treated as stale
-// when the user manually runs 'git commit --amend' (e.g. to fix a typo in
-// the commit message) before running 'scribe amend'.
-//
-// Timeline that triggers this:
-//
-//  1. make commit (HEAD = A)
-//  2. use AI tools → entries in pool, pool-head = A
-//  3. git commit --amend --no-edit   ← only fixes something unrelated; HEAD = A'
-//  4. scribe amend → detects A ≠ A', clears the pool → Assisted-By never added
-func TestAmend_StaleDetection_FalsePositive_ManualGitAmend(t *testing.T) {
-	_, headPath := headFile(t, "hash-before-manual-amend")
-	p := &mockEditPool{entries: []store.Entry{entry("anthropic", "claude-sonnet-4-6")}}
-	g := &mockGit{}
-
-	// HEAD is now A' because the user ran 'git commit --amend' themselves.
-	cmd := newAmendCmd(p, g, nil, headPath, hashFn("hash-after-manual-amend"))
-	var out strings.Builder
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Current behaviour: legitimate entries are cleared (false positive).
-	if !p.cleared {
-		t.Error("current behaviour: pool cleared despite entries being legitimate")
-	}
-	if g.key != "" {
-		t.Error("current behaviour: git amend not called — Assisted-By trailer lost")
 	}
 }

@@ -12,7 +12,7 @@ import (
 // newHookCmd creates the hook subcommand.
 // editPool accumulates tool-use events that feed commit attribution.
 // sessionPool persists session→model mappings and is never cleared.
-func newHookCmd(editPool store.EditPool, sessionPool store.SessionPool, poolPath, headPath string, headHashFn func() (string, error)) *cobra.Command {
+func newHookCmd(editPool store.EditPool, sessionPool store.SessionPool, poolPath string) *cobra.Command {
 	var vendor, model, format string
 
 	cmd := &cobra.Command{
@@ -31,12 +31,6 @@ This command always exits 0 so it never blocks the calling tool.`,
 				return nil
 			}
 
-			// Auto-clear pool when HEAD has changed since last write (e.g. after
-			// a hard reset or branch switch that wasn't caught by branch-scoping).
-			if headPath != "" && poolIsStale(headPath, headHashFn) {
-				_ = editPool.Clear()
-			}
-
 			parser, ok := hook.Get(format)
 			if !ok {
 				fmt.Fprintf(os.Stderr, "scribe hook: %v\n", hook.ErrUnknownFormat(format))
@@ -53,9 +47,6 @@ This command always exits 0 so it never blocks the calling tool.`,
 			}
 
 			routeEntries(entries, editPool, sessionPool)
-			if headPath != "" {
-				writePoolHead(headPath, headHashFn)
-			}
 			return nil
 		},
 	}

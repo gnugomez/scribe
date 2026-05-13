@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newClearCmd(p store.EditPool, storePath, headPath string) *cobra.Command {
+func newClearCmd(p store.EditPool, storePath string) *cobra.Command {
 	return &cobra.Command{
 		Use:          "clear",
 		Short:        "Clear the pool without amending",
@@ -20,9 +20,6 @@ func newClearCmd(p store.EditPool, storePath, headPath string) *cobra.Command {
 			entries, err := p.Drain()
 			if err != nil {
 				return fmt.Errorf("clearing pool: %w", err)
-			}
-			if headPath != "" {
-				removePoolHead(headPath)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "cleared %s  %s\n", bold(fmt.Sprintf("%d entries", len(entries))), success("done"))
 			return nil

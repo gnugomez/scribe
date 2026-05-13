@@ -110,14 +110,12 @@ Create `.copilot/hooks/scribe.json` in your repo or globally at `~/.copilot/hook
 
 ---
 
-## Pool isolation
+## Pool design
 
-The pool is **branch-scoped** — each branch gets its own pool file at `.git/scribe/<branch>/pool.jsonl`. Checking out a different branch automatically uses that branch's pool, so tool usage from one branch never leaks into another.
+The pool is a **single file** at `.git/scribe/pool.jsonl` shared across all branches — just like git's staging area. When you switch branches carrying uncommitted work, the pool entries follow you. The pool is cleared explicitly by `scribe amend` (after annotating) or `scribe clear` (to discard).
 
-The pool also carries a **HEAD sentinel** (`.git/scribe/<branch>/pool-head`) that records the commit hash when entries were last written. If HEAD changes between the last tool event and `scribe amend` — for example after `git reset --hard` or `git checkout <other-commit>` — the pool is automatically discarded rather than applied to the wrong commit.
-
-> [!NOTE]
-> One known false positive: if you run `git commit --amend` yourself (e.g. to fix a typo in the commit message) *before* running `scribe amend`, the sentinel detects a hash change and will discard the pool. In that case, re-run your AI session or use `scribe amend` immediately after each commit.
+> [!TIP]
+> If you discard your work (e.g. `git reset --hard`) without committing, run `scribe clear` to remove the now-irrelevant pool entries.
 
 ---
 

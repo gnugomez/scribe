@@ -33,14 +33,7 @@ the current commit with an Assisted-By trailer.`,
 	sessionPath := ""
 	if repoErr == nil {
 		sessionPath = git.SessionPath(repoRoot)
-		if branch, branchErr := git.CurrentBranch(); branchErr == nil {
-			poolPath = git.PoolPath(repoRoot, branch)
-		}
-	}
-
-	poolHeadPath := ""
-	if poolPath != "" {
-		poolHeadPath = git.PoolHeadPath(poolPath)
+		poolPath = git.PoolPath(repoRoot)
 	}
 
 	editPool := jsonl.NewPool(poolPath)
@@ -48,10 +41,10 @@ the current commit with an Assisted-By trailer.`,
 	gitClient := git.NewClient()
 
 	root.AddCommand(
-		newHookCmd(editPool, sessionPool, poolPath, poolHeadPath, git.HeadHash),
-		newAmendCmd(editPool, gitClient, repoErr, poolHeadPath, git.HeadHash),
+		newHookCmd(editPool, sessionPool, poolPath),
+		newAmendCmd(editPool, gitClient, repoErr),
 		newPoolCmd(editPool, poolPath),
-		newClearCmd(editPool, poolPath, poolHeadPath),
+		newClearCmd(editPool, poolPath),
 		newStatusCmd(editPool, repoErr),
 	)
 
