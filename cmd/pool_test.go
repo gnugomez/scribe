@@ -13,10 +13,11 @@ type errPeekStore struct {
 	err error
 }
 
-func (e *errPeekStore) Add(entries ...store.Entry) error { return nil }
-func (e *errPeekStore) Peek() ([]store.Entry, error)     { return nil, e.err }
-func (e *errPeekStore) Drain() ([]store.Entry, error)    { return nil, nil }
-func (e *errPeekStore) Clear() error                     { return nil }
+func (e *errPeekStore) Add(entries ...store.Entry) error                         { return nil }
+func (e *errPeekStore) Peek() ([]store.Entry, error)                             { return nil, e.err }
+func (e *errPeekStore) Drain() ([]store.Entry, error)                            { return nil, nil }
+func (e *errPeekStore) DrainMatching(map[string]struct{}) ([]store.Entry, error) { return nil, nil }
+func (e *errPeekStore) Clear() error                                             { return nil }
 
 func TestPool_PrintsEntries(t *testing.T) {
 	p := &mockEditPool{entries: []store.Entry{{

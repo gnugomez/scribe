@@ -28,6 +28,20 @@ func (m *mockEditPool) Drain() ([]store.Entry, error) {
 	m.entries = nil
 	return got, m.drainErr
 }
+func (m *mockEditPool) DrainMatching(pairs map[string]struct{}) ([]store.Entry, error) {
+	m.drained = true
+	var matched, remaining []store.Entry
+	for _, e := range m.entries {
+		key := e.Vendor + ":" + e.Model
+		if _, ok := pairs[key]; ok {
+			matched = append(matched, e)
+		} else {
+			remaining = append(remaining, e)
+		}
+	}
+	m.entries = remaining
+	return matched, m.drainErr
+}
 func (m *mockEditPool) Clear() error { m.cleared = true; m.entries = nil; return nil }
 
 type mockSessionPool struct {

@@ -19,6 +19,9 @@ type EditPool interface {
 	Add(entries ...Entry) error
 	Peek() ([]Entry, error)
 	Drain() ([]Entry, error)
+	// DrainMatching removes entries whose Vendor:Model pair is in the given
+	// set and returns them. Unmatched entries remain in the pool.
+	DrainMatching(pairs map[string]struct{}) ([]Entry, error)
 	Clear() error
 }
 

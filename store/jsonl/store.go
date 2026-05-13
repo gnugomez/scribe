@@ -55,6 +55,32 @@ func (p *Pool) Drain() ([]store.Entry, error) {
 	return entries, nil
 }
 
+func (p *Pool) DrainMatching(pairs map[string]struct{}) ([]store.Entry, error) {
+	entries, err := p.readAll()
+	if err != nil {
+		return nil, err
+	}
+	var matched, remaining []store.Entry
+	for _, e := range entries {
+		key := e.Vendor + ":" + e.Model
+		if _, ok := pairs[key]; ok {
+			matched = append(matched, e)
+		} else {
+			remaining = append(remaining, e)
+		}
+	}
+	// Rewrite the pool with only unmatched entries.
+	if err := p.Clear(); err != nil {
+		return matched, err
+	}
+	if len(remaining) > 0 {
+		if err := p.Add(remaining...); err != nil {
+			return matched, err
+		}
+	}
+	return matched, nil
+}
+
 func (p *Pool) Clear() error {
 	if _, err := os.Stat(p.path); os.IsNotExist(err) {
 		return nil
