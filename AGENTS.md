@@ -42,3 +42,7 @@ Both files live inside `.git/` — local to the repo, never committed, no `.giti
 Parse failures and pool errors are printed to stderr but not returned, so they never interrupt the calling AI tool.
 
 **Error wrapping.** Use `fmt.Errorf("context: %w", err)`. Commands use `cobra.Command.RunE` (not `Run`).
+
+## Changelog
+
+When modifying source code, add an entry to the `[Unreleased]` section of [CHANGELOG.md](CHANGELOG.md). Create the section if it doesn't exist (insert it above the most recent versioned entry). Use Keep a Changelog categories: `Added`, `Changed`, `Fixed`, `Removed`. Keep entries short — one line each.
