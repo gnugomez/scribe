@@ -9,6 +9,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+  - Pool reader now handles lines larger than 64 KiB
+
 ### Changed
 
   - Single shared pool at `.git/scribe/pool.jsonl` — follows uncommitted work across branches

@@ -100,6 +100,7 @@ func (p *Pool) readAll() ([]store.Entry, error) {
 
 	var entries []store.Entry
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // allow up to 1 MiB per line
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
