@@ -7,6 +7,25 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+  - Single shared pool at `.git/scribe/pool.jsonl` — follows uncommitted work across branches
+  - `scribe amend` shows an interactive picker when multiple models are in the pool
+  - Only selected entries are drained; unselected remain for future commits
+
+### Added
+
+  - `--all` / `-y` flag on `scribe amend` to skip the picker
+
+### Removed
+
+  - Branch-scoped pool isolation
+  - Stale-pool guard (HEAD sentinel auto-clear)
+
+---
+
 ## [0.1.0] — 2026-05-05
 
 ### Added
