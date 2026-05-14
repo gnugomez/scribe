@@ -81,7 +81,19 @@ func enrichEntriesWithSessionModel(sessionPool store.SessionPool, entries []stor
 			}
 		}
 		if e.SessionID != "" && !isUnknownModel(e.Model) {
-			modelBySession[sessionKey(e.Vendor, e.SessionID)] = e.Model
+			key := sessionKey(e.Vendor, e.SessionID)
+			if _, already := modelBySession[key]; !already {
+				// Persist newly discovered model to session pool so it
+				// survives edit-pool drains (amend/clear).
+				_ = sessionPool.Add(store.Entry{
+					Timestamp:   e.Timestamp,
+					Vendor:      e.Vendor,
+					Model:       e.Model,
+					ModelSource: e.ModelSource,
+					SessionID:   e.SessionID,
+				})
+			}
+			modelBySession[key] = e.Model
 		}
 	}
 }

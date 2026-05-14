@@ -247,6 +247,63 @@ func TestHook_SessionModelSurvivesDrain(t *testing.T) {
 	}
 }
 
+// TestHook_PayloadModelPersistedToSessionPool verifies that when a PostToolUse
+// carries the model in its payload but no SessionStart was recorded with it,
+// the model gets persisted to the session pool so future events (after amend
+// drains the edit pool) can still resolve it.
+func TestHook_PayloadModelPersistedToSessionPool(t *testing.T) {
+	edit := &mockEditPool{}
+	session := &mockEditPool{}
+
+	run := func(payload string) {
+		cmd := newHookCmd(edit, session, "/fake/pool/path")
+		cmd.SetIn(strings.NewReader(payload))
+		cmd.SetOut(&strings.Builder{})
+		cmd.SetErr(&strings.Builder{})
+		cmd.SetArgs([]string{"--vendor", "anthropic", "--format", "claude"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("hook error: %v", err)
+		}
+	}
+
+	// 1. SessionStart without model — session pool only has fallback "claude".
+	run(`{"hook_event_name":"SessionStart","session_id":"sess-99"}`)
+	if len(session.entries) != 1 {
+		t.Fatalf("expected 1 session entry, got %d", len(session.entries))
+	}
+	if session.entries[0].Model != "claude" {
+		t.Fatalf("expected fallback model in session entry, got %q", session.entries[0].Model)
+	}
+
+	// 2. PostToolUse WITH model in payload — model gets persisted to session pool.
+	run(`{"hook_event_name":"PostToolUse","session_id":"sess-99","model":"claude-sonnet-4-6","tool_name":"Write"}`)
+	if len(edit.entries) != 1 {
+		t.Fatalf("expected 1 edit entry, got %d", len(edit.entries))
+	}
+	if edit.entries[0].Model != "claude-sonnet-4-6" {
+		t.Fatalf("expected payload model, got %q", edit.entries[0].Model)
+	}
+	// Session pool should now have an additional entry with the real model.
+	if len(session.entries) < 2 {
+		t.Fatalf("expected model to be persisted to session pool, got %d entries", len(session.entries))
+	}
+
+	// 3. Simulate amend — drain edit pool.
+	_, _ = edit.Drain()
+
+	// 4. PostToolUse WITHOUT model — should still resolve from session pool.
+	run(`{"hook_event_name":"PostToolUse","session_id":"sess-99","tool_name":"Read"}`)
+	if len(edit.entries) != 1 {
+		t.Fatalf("expected 1 edit entry after drain, got %d", len(edit.entries))
+	}
+	if edit.entries[0].Model != "claude-sonnet-4-6" {
+		t.Fatalf("expected session-resolved model after drain, got %q", edit.entries[0].Model)
+	}
+	if edit.entries[0].ModelSource != "session" {
+		t.Fatalf("expected model source session, got %q", edit.entries[0].ModelSource)
+	}
+}
+
 func TestHook_DoesNotMixSessionModelAcrossVendors(t *testing.T) {
 	// Seed session store with a github entry.
 	session := &mockEditPool{entries: []store.Entry{{
