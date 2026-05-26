@@ -68,8 +68,19 @@ func SessionPath(root string) string {
 }
 
 // AmendTrailer runs git commit --amend --no-edit --trailer "key: value".
+// If the trailer already exists on the commit, the new value is merged with
+// the existing one (duplicates removed).
 // Requires git 2.32+.
 func (c *Client) AmendTrailer(key, value string) error {
+	// Check if trailer already exists on HEAD.
+	existing, err := c.trailerValue("HEAD", key)
+	if err != nil {
+		return err
+	}
+	// Merge with existing if present.
+	if existing != "" {
+		value = mergeTrailerValues(existing, value)
+	}
 	trailer := fmt.Sprintf("%s: %s", key, value)
 	cmd := exec.Command("git", "commit", "--amend", "--no-edit", "--trailer", trailer)
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -154,24 +165,28 @@ func (c *Client) AmendTrailerOnCommits(out io.Writer, hashes []string, key, valu
 		return err
 	}
 
-	// Build a set of short hashes (first 7 chars) for matching in the rebase todo.
+	// Build a set of short hashes (first 7 chars) and pre-fetch current trailer values.
 	hashSet := make(map[string]bool, len(hashes))
-	shortHashes := make(map[string]string) // map short -> full for feedback
+	trailersByShort := make(map[string]string) // map short hash -> merged trailer value
 	for _, h := range hashes {
 		if len(h) >= 7 {
 			short := h[:7]
 			hashSet[short] = true
-			shortHashes[short] = h
+			// Get current trailer value for this commit.
+			existing, _ := c.trailerValue(h, key)
+			merged := value
+			if existing != "" {
+				merged = mergeTrailerValues(existing, value)
+			}
+			trailersByShort[short] = merged
 		}
 	}
-
-	trailer := fmt.Sprintf("%s: %s", key, value)
 
 	// Find the oldest commit (last in the slice since hashes are newest-first).
 	oldest := hashes[len(hashes)-1]
 
 	// Write a temporary awk-based editor script that inserts exec lines.
-	script, err := c.writeRebaseScript(hashSet, trailer)
+	script, err := c.writeRebaseScript(hashSet, key, trailersByShort)
 	if err != nil {
 		return err
 	}
@@ -202,14 +217,16 @@ func (c *Client) headHash() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func (c *Client) writeRebaseScript(hashSet map[string]bool, trailer string) (string, error) {
-	// Escape trailer for embedding inside an awk double-quoted string.
-	escaped := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(trailer)
-
+func (c *Client) writeRebaseScript(hashSet map[string]bool, key string, trailersByShort map[string]string) (string, error) {
 	// Build awk patterns that match selected commits.
 	var patterns []string
 	for short := range hashSet {
-		patterns = append(patterns, fmt.Sprintf(`/^pick %s/ { print; print "exec echo Amending %s..."; print "exec git commit --amend --no-edit --trailer \"%s\""; print "exec echo Amended %s"; next }`, short, short, escaped, short))
+		// Get the merged trailer value for this commit.
+		value := trailersByShort[short]
+		// Escape for embedding inside an awk double-quoted string.
+		escaped := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value)
+		trailer := fmt.Sprintf("%s: %s", key, escaped)
+		patterns = append(patterns, fmt.Sprintf(`/^pick %s/ { print; print "exec echo Amending %s..."; print "exec git commit --amend --no-edit --trailer \"%s\""; print "exec echo Amended %s"; next }`, short, short, trailer, short))
 	}
 	awkBody := strings.Join(patterns, "\n") + "\n{ print }"
 	scriptContent := fmt.Sprintf("#!/bin/sh\nawk '%s' \"$1\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\"\n", awkBody)
@@ -233,6 +250,56 @@ func (c *Client) writeRebaseScript(hashSet map[string]bool, trailer string) (str
 		return "", err
 	}
 	return f.Name(), nil
+}
+
+// trailerValue extracts the value of a trailer from a commit.
+// Returns empty string if the trailer doesn't exist.
+func (c *Client) trailerValue(ref, key string) (string, error) {
+	// Use git log with a custom format to extract trailers.
+	// %(trailers) includes all trailers, we parse them to find the key.
+	out, err := exec.Command("git", "log", "-1", "--format=%(trailers)", ref).Output()
+	if err != nil {
+		return "", nil // Ref might not exist, return empty
+	}
+	trailers := string(out)
+	for _, line := range strings.Split(trailers, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if parts := strings.SplitN(line, ":", 2); len(parts) == 2 && strings.TrimSpace(parts[0]) == key {
+			return strings.TrimSpace(parts[1]), nil
+		}
+	}
+	return "", nil
+}
+
+// mergeTrailerValues combines two comma-separated trailer values,
+// removing duplicates while preserving order.
+func mergeTrailerValues(existing, new string) string {
+	// Split both on commas and collect unique pairs.
+	var seenPairs map[string]bool = make(map[string]bool)
+	var result []string
+
+	// Add existing values first (preserving their order).
+	for _, pair := range strings.Split(existing, ",") {
+		pair = strings.TrimSpace(pair)
+		if pair != "" && !seenPairs[pair] {
+			seenPairs[pair] = true
+			result = append(result, pair)
+		}
+	}
+
+	// Add new values (only if not already present).
+	for _, pair := range strings.Split(new, ",") {
+		pair = strings.TrimSpace(pair)
+		if pair != "" && !seenPairs[pair] {
+			seenPairs[pair] = true
+			result = append(result, pair)
+		}
+	}
+
+	return strings.Join(result, ", ")
 }
 
 func parseCommitLog(output string) []Commit {

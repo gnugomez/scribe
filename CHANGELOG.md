@@ -11,8 +11,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
-- Interactive commit picker in `amend` — shows unpushed commits (or commits since fork point on new branches) and lets you choose which to annotate
-- `--since` (`-s`) flag accepts any git ref (hash, `HEAD~5`, branch) to control commit range
+- Multi-commit amendment: `amend` now supports annotating multiple unpushed commits (or commits since fork point on new branches) with an interactive picker
+- `--since` (`-s`) flag to control commit range (accepts any git ref: hash, `HEAD~5`, branch, etc.)
+- Real-time per-commit progress feedback during batch amendment operations
+- Smart trailer merging: new models are merged with existing `Assisted-By` trailers instead of creating duplicates
 
 ## [0.2.1] - 2026-21-05
 

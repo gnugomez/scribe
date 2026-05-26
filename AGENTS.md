@@ -43,6 +43,12 @@ Parse failures and pool errors are printed to stderr but not returned, so they n
 
 **Error wrapping.** Use `fmt.Errorf("context: %w", err)`. Commands use `cobra.Command.RunE` (not `Run`).
 
+**Tests for new features.** Every new public function or feature must have corresponding unit tests (typically in a `*_test.go` file in the same package). Include tests for:
+- Normal/happy path cases
+- Edge cases (empty inputs, nil values, etc.)
+- Error conditions when applicable
+Run `go test ./...` before committing to verify all tests pass.
+
 ## Changelog
 
 When modifying source code, add an entry to the `[Unreleased]` section of [CHANGELOG.md](CHANGELOG.md). Create the section if it doesn't exist (insert it above the most recent versioned entry). Use Keep a Changelog categories: `Added`, `Changed`, `Fixed`, `Removed`. Keep entries short — one line each. It's important that the messages only highlight the user-facing changes, not internal refactors or implementation details.
