@@ -109,8 +109,7 @@ Use --dry-run to preview without modifying commits or clearing the pool.`,
 					return err
 				}
 			} else {
-				if err := g.AmendTrailerOnCommits(targetHashes, "Assisted-By", trailerValue); err != nil {
-					return err
+			if err := g.AmendTrailerOnCommits(out, targetHashes, "Assisted-By", trailerValue); err != nil {
 				}
 			}
 

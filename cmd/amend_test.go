@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io"
 	"strings"
 	"testing"
 
@@ -81,7 +82,7 @@ func (m *mockGit) CommitsSince(ref string) ([]git.Commit, error) {
 	return m.sinceCommits, nil
 }
 
-func (m *mockGit) AmendTrailerOnCommits(hashes []string, key, value string) error {
+func (m *mockGit) AmendTrailerOnCommits(out io.Writer, hashes []string, key, value string) error {
 	m.hashes = hashes
 	m.key = key
 	m.value = value

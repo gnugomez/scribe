@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,8 +34,9 @@ type Git interface {
 	CommitsSince(ref string) ([]Commit, error)
 
 	// AmendTrailerOnCommits adds the trailer to one or more commits identified
-	// by their full SHA. Hashes must be ordered newest-first.
-	AmendTrailerOnCommits(hashes []string, key, value string) error
+	// by their full SHA. Hashes must be ordered newest-first. Progress is written
+	// to out (use io.Discard to suppress).
+	AmendTrailerOnCommits(out io.Writer, hashes []string, key, value string) error
 }
 
 // Client is the exec-based Git implementation.
@@ -132,7 +134,8 @@ func (c *Client) forkBase() string {
 
 // AmendTrailerOnCommits adds the trailer to the given commits using an
 // interactive rebase with exec commands. Hashes must be ordered newest-first.
-func (c *Client) AmendTrailerOnCommits(hashes []string, key, value string) error {
+// Progress output is written to out.
+func (c *Client) AmendTrailerOnCommits(out io.Writer, hashes []string, key, value string) error {
 	if len(hashes) == 0 {
 		return nil
 	}
@@ -143,14 +146,22 @@ func (c *Client) AmendTrailerOnCommits(hashes []string, key, value string) error
 		return err
 	}
 	if len(hashes) == 1 && hashes[0] == head {
-		return c.AmendTrailer(key, value)
+		fmt.Fprintf(out, "Amending %s...\n", head[:7])
+		err := c.AmendTrailer(key, value)
+		if err == nil {
+			fmt.Fprintf(out, "Amended %s\n", head[:7])
+		}
+		return err
 	}
 
 	// Build a set of short hashes (first 7 chars) for matching in the rebase todo.
 	hashSet := make(map[string]bool, len(hashes))
+	shortHashes := make(map[string]string) // map short -> full for feedback
 	for _, h := range hashes {
 		if len(h) >= 7 {
-			hashSet[h[:7]] = true
+			short := h[:7]
+			hashSet[short] = true
+			shortHashes[short] = h
 		}
 	}
 
@@ -166,14 +177,20 @@ func (c *Client) AmendTrailerOnCommits(hashes []string, key, value string) error
 	}
 	defer os.Remove(script)
 
+	fmt.Fprintf(out, "Amending %d commit(s)...\n", len(hashes))
+
 	// Run interactive rebase with our custom sequence editor.
 	cmd := exec.Command("git", "rebase", "-i", oldest+"^")
 	cmd.Env = append(os.Environ(), "GIT_SEQUENCE_EDITOR="+script)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	cmd.Stdout = out
+	cmd.Stderr = out
+	if err := cmd.Run(); err != nil {
 		// Attempt to abort the rebase on failure.
 		_ = exec.Command("git", "rebase", "--abort").Run()
-		return fmt.Errorf("rebase failed: %w\n%s", err, out)
+		return fmt.Errorf("rebase failed: %w", err)
 	}
+	
+	fmt.Fprintf(out, "Successfully amended %d commit(s)\n", len(hashes))
 	return nil
 }
 
@@ -192,7 +209,7 @@ func (c *Client) writeRebaseScript(hashSet map[string]bool, trailer string) (str
 	// Build awk patterns that match selected commits.
 	var patterns []string
 	for short := range hashSet {
-		patterns = append(patterns, fmt.Sprintf(`/^pick %s/ { print; print "exec git commit --amend --no-edit --trailer \"%s\""; next }`, short, escaped))
+		patterns = append(patterns, fmt.Sprintf(`/^pick %s/ { print; print "exec echo Amending %s..."; print "exec git commit --amend --no-edit --trailer \"%s\""; print "exec echo Amended %s"; next }`, short, short, escaped, short))
 	}
 	awkBody := strings.Join(patterns, "\n") + "\n{ print }"
 	scriptContent := fmt.Sprintf("#!/bin/sh\nawk '%s' \"$1\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\"\n", awkBody)
