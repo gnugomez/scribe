@@ -2,13 +2,15 @@
 
 `scribe` maintains a **per-repo pool** of tool usage events. Each time the harness invokes a tool, a hook adds an entry to the pool.
 
-Run `scribe amend` to drain the pool and annotate the current commit with:
+Run `scribe amend` to drain the pool and annotate one or more commits with:
 
 ```
 Assisted-By: anthropic:claude-sonnet-4-6, github:gpt-4o
 ```
 
-The pool is stored at `.git/scribe/<branch>/pool.jsonl` — scoped to the current branch, local to the repo, inside `.git/` so it is never committed and requires no `.gitignore` entry.
+You'll be prompted to select which models to include and which commits to annotate. If a commit already has an `Assisted-By` trailer, new models are merged with existing ones to avoid duplicates.
+
+The pool is stored at `.git/scribe/pool.jsonl` — a single file shared across all branches, local to the repo, inside `.git/` so it is never committed and requires no `.gitignore` entry.
 
 ## Installation
 
@@ -20,20 +22,20 @@ go install github.com/gnugomez/scribe@latest
 
 In order to capture tool usage, you need to set up hooks for your AI tools (see below). Once that's done, the typical workflow is:
 
-Just run `scribe amend` after your commit to annotate it with the tools you used. This is a manual step so you can choose which commits to annotate and when.
+Run `scribe amend` to annotate your commits with the tools you used. This is a manual step so you can choose which models to include and which commits to annotate. You'll see interactive pickers for both selections.
 
 ```bash
 scribe amend
 ```
-This could be paired with pre-commit hooks.
 
+By default, unpushed commits (or commits since the fork point on new branches) are offered for selection. Use `scribe amend --help` to see options for controlling the commit range, skipping the interactive pickers, or previewing changes before applying them.
 
-Some other useful commands:
+Other useful commands:
 
 ```bash
-scribe amend --dry-run   # Preview the annotation without clearing the pool
-scribe pool # View the list of captured tool events in the pool
-scribe clear # Discard pool without amending
+scribe pool   # View captured tool events
+scribe clear  # Discard pool without amending
+scribe amend --help  # See all options (dry-run, since, all, etc.)
 ```
 
 ---
@@ -112,24 +114,27 @@ Create `.copilot/hooks/scribe.json` in your repo or globally at `~/.copilot/hook
 
 ## Pool design
 
-The pool is a **single file** at `.git/scribe/pool.jsonl` shared across all branches — just like git's staging area. When you switch branches carrying uncommitted work, the pool entries follow you. The pool is cleared explicitly by `scribe amend` (after annotating) or `scribe clear` (to discard).
+  The pool is a **single file** at `.git/scribe/pool.jsonl` shared across all branches — just like git's staging area. When you switch branches carrying uncommitted work, the pool entries follow you. The pool is cleared explicitly by `scribe amend` (after annotating) or `scribe clear` (to discard).
 
-> [!TIP]
-> If you discard your work (e.g. `git reset --hard`) without committing, run `scribe clear` to remove the now-irrelevant pool entries.
+### Trailer merging
+
+  When you run `scribe amend`, the new models are merged with any existing `Assisted-By` trailers on the target commits. Duplicate vendor:model pairs are automatically deduplicated. This means you can safely re-run `scribe amend` on the same commits without creating duplicate entries.
+
+  > [!TIP]
+  > If you discard your work (e.g. `git reset --hard`) without committing, run `scribe clear` to remove the now-irrelevant pool entries.
 
 ---
 
 ## Workflow
 
 ```
-# Work session with Claude Code and Copilot Chat:
+# Work session with your AI tools:
 # → hooks fire automatically as each tool writes files
 
 git add -A
 git commit -m "feat: implement user auth"
 
-scribe amend --dry-run   # preview: Assisted-By: anthropic:claude-sonnet-4-6, github:gpt-4o
-scribe amend             # apply and clear pool
+scribe amend  # interactively select models and commits to annotate
 ```
 
 ---
@@ -138,10 +143,10 @@ scribe amend             # apply and clear pool
 
 Adding a new hook format requires only a new vendor hook package:
 
-1. Create `vendors/<toolname>/hook/parser.go`
+1. Create `hook/<vendor>/parser.go`
 2. Implement the `hook.Parser` interface (`Name()` + `Parse()`)
 3. Self-register via `func init() { hook.Register(&Parser{}) }`
-4. Add a blank import in `cmd/root.go` for `github.com/gnugomez/scribe/vendors/<toolname>/hook`
+4. Add a blank import in `cmd/root.go` for `github.com/gnugomez/scribe/hook/<vendor>`
 
 The core (`cmd/amend.go`, `cmd/hook.go`) never needs to change.
 
@@ -149,11 +154,11 @@ The core (`cmd/amend.go`, `cmd/hook.go`) never needs to change.
 
 ## Pool file
 
-`.git/scribe/<branch>/pool.jsonl` — one JSON object per line:
+`.git/scribe/pool.jsonl` — one JSON object per line:
 
 ```json
 {"timestamp":"2026-04-13T10:00:00Z","vendor":"anthropic","model":"claude-sonnet-4-6"}
 {"timestamp":"2026-04-13T10:01:00Z","vendor":"github","model":"gpt-4o"}
 ```
 
-  With `scribe pool --debug`, each entry also shows `model source` so you can see where attribution came from: `payload`, `session`, `flag`, or `default`.
+With `scribe pool --debug`, each entry also shows `model source` so you can see where attribution came from: `payload`, `session`, `flag`, or `default`.
