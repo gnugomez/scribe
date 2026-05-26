@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gnugomez/scribe/git"
 	"github.com/gnugomez/scribe/store"
 )
 
@@ -57,12 +58,31 @@ func (m *mockSessionPool) Peek() ([]store.Entry, error) { return m.entries, nil 
 // --- mock git ---
 
 type mockGit struct {
-	key   string
-	value string
-	err   error
+	key    string
+	value  string
+	err    error
+	hashes []string // hashes passed to AmendTrailerOnCommits
+
+	unpushedCommits  []git.Commit
+	sinceCommits     []git.Commit
 }
 
 func (m *mockGit) AmendTrailer(key, value string) error {
+	m.key = key
+	m.value = value
+	return m.err
+}
+
+func (m *mockGit) UnpushedCommits() ([]git.Commit, error) {
+	return m.unpushedCommits, nil
+}
+
+func (m *mockGit) CommitsSince(ref string) ([]git.Commit, error) {
+	return m.sinceCommits, nil
+}
+
+func (m *mockGit) AmendTrailerOnCommits(hashes []string, key, value string) error {
+	m.hashes = hashes
 	m.key = key
 	m.value = value
 	return m.err

@@ -7,6 +7,13 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Interactive commit picker in `amend` — shows unpushed commits (or commits since fork point on new branches) and lets you choose which to annotate
+- `--since` (`-s`) flag accepts any git ref (hash, `HEAD~5`, branch) to control commit range
+
 ## [0.2.1] - 2026-21-05
 
 ### Fixed

@@ -45,4 +45,4 @@ Parse failures and pool errors are printed to stderr but not returned, so they n
 
 ## Changelog
 
-When modifying source code, add an entry to the `[Unreleased]` section of [CHANGELOG.md](CHANGELOG.md). Create the section if it doesn't exist (insert it above the most recent versioned entry). Use Keep a Changelog categories: `Added`, `Changed`, `Fixed`, `Removed`. Keep entries short — one line each.
+When modifying source code, add an entry to the `[Unreleased]` section of [CHANGELOG.md](CHANGELOG.md). Create the section if it doesn't exist (insert it above the most recent versioned entry). Use Keep a Changelog categories: `Added`, `Changed`, `Fixed`, `Removed`. Keep entries short — one line each. It's important that the messages only highlight the user-facing changes, not internal refactors or implementation details.

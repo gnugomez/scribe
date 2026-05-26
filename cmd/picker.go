@@ -17,6 +17,7 @@ type picker struct {
 	selected []bool
 	cursor   int
 	out      io.Writer
+	header   string
 }
 
 func newPicker(items []string) *picker {
@@ -24,6 +25,13 @@ func newPicker(items []string) *picker {
 	for i := range sel {
 		sel[i] = true
 	}
+	return &picker{items: items, selected: sel, out: os.Stderr}
+}
+
+// newPickerWithDefaults creates a picker with explicit default selections.
+func newPickerWithDefaults(items []string, defaults []bool) *picker {
+	sel := make([]bool, len(items))
+	copy(sel, defaults)
 	return &picker{items: items, selected: sel, out: os.Stderr}
 }
 
@@ -99,7 +107,11 @@ func (p *picker) Run() ([]int, error) {
 func (p *picker) render() {
 	// Move cursor to start and clear lines.
 	p.clearDisplay()
-	fmt.Fprintf(p.out, "\r%s\r\n", dim("Select models to include (space=toggle, a=all, enter=confirm):"))
+	header := p.header
+	if header == "" {
+		header = "Select models to include (space=toggle, a=all, enter=confirm):"
+	}
+	fmt.Fprintf(p.out, "\r%s\r\n", dim(header))
 	for i, item := range p.items {
 		cursor := "  "
 		if i == p.cursor {
