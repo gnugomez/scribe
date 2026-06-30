@@ -175,4 +175,4 @@ With `scribe pool --debug`, each entry also shows `model source` so you can see 
 
 ---
 
-Copyright 2026 the Eclipse Foundation AISBL
+Copyright (c) 2026 Eclipse Foundation AISBL
