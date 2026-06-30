@@ -1,5 +1,5 @@
 <!--
-  ~ Copyright (c) 2026 Jordi Gómez Hidalgo
+  ~ Copyright (c) 2026 Eclipse Foundation AISBL
   ~ 
   ~ This program and the accompanying materials are made available under the
   ~ terms of the Eclipse Public License 2.0 which is available at
@@ -172,3 +172,7 @@ The core (`cmd/amend.go`, `cmd/hook.go`) never needs to change.
 ```
 
 With `scribe pool --debug`, each entry also shows `model source` so you can see where attribution came from: `payload`, `session`, `flag`, or `default`.
+
+---
+
+Copyright 2026 the Eclipse Foundation AISBL
